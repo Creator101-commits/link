@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build Android App (Kotlin)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Run Android Lint
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bridge-Android-APK
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+
+  build-macos:
+    name: Build macOS Menu Bar App (Swift)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mac-app
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Swift Unit Tests
+        run: make test
+
+      - name: Build Bridge.app
+        run: make clean && make
+
+      - name: Verify Code Signature & Resources
+        run: |
+          codesign --verify --deep --strict Bridge.app
+          test -f Bridge.app/Contents/Resources/Assets.car
+          test -f Bridge.app/Contents/Resources/Bridge.icns
+          test ! -d Bridge.app/Contents/Resources/Bridge.icon
+
+      - name: Package Bridge.app DMG
+        run: |
+          make dmg
+          hdiutil verify Bridge-macOS.dmg
+
+      - name: Upload macOS App artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bridge-macOS-App
+          path: mac-app/Bridge-macOS.dmg

@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android Release Asset
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Configure Android Release Signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "::error::Missing required Android release signing secrets."
+            exit 1
+          fi
+          KEYSTORE_FILE="$RUNNER_TEMP/bridge-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+
+      - name: Build Signed Release Android APK
+        working-directory: android-app
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Clean up Release Keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/bridge-release.jks"
+
+      - name: Rename and Verify APK Signature
+        run: |
+          TAG_NAME="${{ github.event.inputs.tag || github.ref_name }}"
+          APK_OUT="Bridge-${TAG_NAME}-Android.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$APK_OUT"
+          SDK_DIR="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          APKSIGNER="$(find "$SDK_DIR/build-tools" -name apksigner | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::Could not find apksigner under $SDK_DIR/build-tools."
+            exit 1
+          fi
+          "$APKSIGNER" verify --print-certs "$APK_OUT"
+
+      - name: Upload Android asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: Bridge-*-Android.apk
+
+  build-macos:
+    name: Build macOS Release Asset
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build & Package Bridge.app (.dmg)
+        run: |
+          TAG_NAME="${{ github.event.inputs.tag || github.ref_name }}"
+          cd mac-app
+          make clean && make
+          codesign --verify --deep --strict Bridge.app
+          make dmg DMG_NAME="../Bridge-${TAG_NAME}-macOS.dmg"
+
+      - name: Upload macOS asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: Bridge-*-macOS.dmg
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-android, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built assets
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate SHA-256 Checksums
+        working-directory: dist
+        run: sha256sum Bridge-* > SHA256SUMS.txt
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Bridge ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/Bridge-*-Android.apk
+            dist/Bridge-*-macOS.dmg
+            dist/SHA256SUMS.txt

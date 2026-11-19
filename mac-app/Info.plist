@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Bridge</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.link.bridge</string>
+    <key>CFBundleName</key>
+    <string>Bridge</string>
+    <key>CFBundleDisplayName</key>
+    <string>Bridge</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.3.5</string>
+    <key>CFBundleVersion</key>
+    <string>8</string>
+    <key>CFBundleIconFile</key>
+    <string>Bridge.icns</string>
+    <key>CFBundleIconName</key>
+    <string>Bridge</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Bridge uses Bluetooth to connect to your Android phone directly, without Wi-Fi or internet.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Allow Bridge to send files from your Desktop folder to your Android phone.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Allow Bridge to send files from your Documents folder to your Android phone.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>Allow Bridge to save incoming files and send files from your Downloads folder.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleURLName</key>
+            <string>com.link.bridge.url</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>bridge</string>
+            </array>
+        </dict>
+    </array>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>All Files</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.item</string>
+                <string>public.data</string>
+                <string>public.content</string>
+            </array>
+        </dict>
+    </array>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSBackgroundColorName</key>
+            <string>background</string>
+            <key>NSIconName</key>
+            <string>NSActionTemplate</string>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>Share with Bridge</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>shareWithBridge</string>
+            <key>NSPortName</key>
+            <string>Bridge</string>
+            <key>NSSendFileTypes</key>
+            <array>
+                <string>public.item</string>
+                <string>public.content</string>
+                <string>public.data</string>
+            </array>
+            <key>NSSendTypes</key>
+            <array>
+                <string>NSFilenamesPboardType</string>
+                <string>public.file-url</string>
+                <string>public.url</string>
+                <string>public.item</string>
+                <string>public.content</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
