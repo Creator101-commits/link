@@ -298,6 +298,78 @@ class BridgeCoreUnitTest {
     }
 
     @Test
+    fun bridgeFastLink_chooseDataRoute_allBranches() {
+        // LAN control host always routes data over LAN.
+        assertEquals(
+            BridgeFastLink.DataRoute.LAN,
+            BridgeFastLink.chooseDataRoute("192.168.1.5", fastLinkEnabled = true, fastLinkSupported = true)
+        )
+        assertEquals(
+            BridgeFastLink.DataRoute.LAN,
+            BridgeFastLink.chooseDataRoute("192.168.1.5", fastLinkEnabled = false, fastLinkSupported = false)
+        )
+        // Bluetooth control + enabled + supported -> fast link.
+        assertEquals(
+            BridgeFastLink.DataRoute.FAST_LINK,
+            BridgeFastLink.chooseDataRoute(BridgeTransport.BLUETOOTH_HOST, true, true)
+        )
+        // Disabled or unsupported -> stay on the Bluetooth relay.
+        assertEquals(
+            BridgeFastLink.DataRoute.BLUETOOTH,
+            BridgeFastLink.chooseDataRoute(BridgeTransport.BLUETOOTH_HOST, false, true)
+        )
+        assertEquals(
+            BridgeFastLink.DataRoute.BLUETOOTH,
+            BridgeFastLink.chooseDataRoute(BridgeTransport.BLUETOOTH_HOST, true, false)
+        )
+        // No control host -> Bluetooth fallback.
+        assertEquals(
+            BridgeFastLink.DataRoute.BLUETOOTH,
+            BridgeFastLink.chooseDataRoute(null, true, true)
+        )
+    }
+
+    @Test
+    fun bridgeFastLink_parseReady_and_stripQuotes() {
+        val session = "abc12345-6789"
+        val ok = JSONObject("""{"type":"fastlink_ready","session":"$session","ip":"192.168.43.1"}""")
+        assertEquals("192.168.43.1", BridgeFastLink.parseReady(ok, session))
+
+        // Wrong session -> null
+        assertNull(BridgeFastLink.parseReady(ok, "other-session"))
+        // Public IP -> null
+        val pub = JSONObject("""{"session":"$session","ip":"8.8.8.8"}""")
+        assertNull(BridgeFastLink.parseReady(pub, session))
+        // Loopback -> null
+        val loop = JSONObject("""{"session":"$session","ip":"127.0.0.1"}""")
+        assertNull(BridgeFastLink.parseReady(loop, session))
+        // Missing ip -> null
+        val missing = JSONObject("""{"session":"$session"}""")
+        assertNull(BridgeFastLink.parseReady(missing, session))
+
+        assertEquals("AndroidShare_1234", BridgeFastLink.stripQuotes("\"AndroidShare_1234\""))
+        assertEquals("plain", BridgeFastLink.stripQuotes("plain"))
+        assertNull(BridgeFastLink.stripQuotes(null))
+        assertEquals("\"unclosed", BridgeFastLink.stripQuotes("\"unclosed"))
+    }
+
+    @Test
+    fun bridgeFastLink_isInFailureCooldown() {
+        val t0 = 1_000_000L
+        // Never failed -> not in cooldown
+        assertFalse(BridgeFastLink.isInFailureCooldown(t0, 0L))
+        // Just failed -> in cooldown
+        assertTrue(BridgeFastLink.isInFailureCooldown(t0, t0))
+        assertTrue(BridgeFastLink.isInFailureCooldown(t0 + 30_000, t0))
+        // At the boundary -> out of cooldown
+        assertFalse(BridgeFastLink.isInFailureCooldown(t0 + 60_000, t0))
+        assertFalse(BridgeFastLink.isInFailureCooldown(t0 + 120_000, t0))
+        // Custom cooldown window
+        assertTrue(BridgeFastLink.isInFailureCooldown(t0 + 5_000, t0, cooldownMs = 10_000))
+        assertFalse(BridgeFastLink.isInFailureCooldown(t0 + 10_000, t0, cooldownMs = 10_000))
+    }
+
+    @Test
     fun isUsableLanHost_rejectsLoopbackAndPublic_acceptsPrivateLan() {
         val rejected = listOf(
             null,

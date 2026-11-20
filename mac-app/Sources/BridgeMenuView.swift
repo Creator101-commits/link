@@ -862,6 +862,7 @@ struct BridgeMenuView: View {
     @ObservedObject var notifManager: BridgeNotificationManager = BridgeNotificationManager.shared
     @ObservedObject var fileTransferManager: BridgeFileTransferManager = BridgeFileTransferManager.shared
     @ObservedObject var axObserver: AXNotificationObserver = AXNotificationObserver.shared
+    @ObservedObject var fastLinkManager: BridgeFastLinkManager = BridgeFastLinkManager.shared
 
     private var isPairedOrConnected: Bool {
         model.isConnected || model.pairedDevice != nil
@@ -1527,6 +1528,12 @@ struct BridgeMenuView: View {
                                 Text(model.isDropTargeted ? "Release to begin high-speed transfer" : "Direct Bluetooth / Wi-Fi stream · No size limit")
                                     .font(.custom("PlusJakartaSans-Regular", size: 11))
                                     .foregroundColor(model.isDropTargeted ? BridgeColors.soft : BridgeColors.muted)
+
+                                if let fastLinkStatus = fastLinkManager.statusText {
+                                    Text(fastLinkStatus)
+                                        .font(.custom("PlusJakartaSans-Regular", size: 11))
+                                        .foregroundColor(BridgeColors.soft)
+                                }
                             }
                             .padding(.vertical, 16)
                             .frame(maxWidth: .infinity)
@@ -1753,6 +1760,23 @@ struct BridgeMenuView: View {
                                 Divider().background(BridgeColors.line.opacity(0.6))
 
                                 MacSaveLocationRow(fileTransferManager: fileTransferManager)
+
+                                Divider().background(BridgeColors.line.opacity(0.6))
+
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Fast transfers via phone hotspot")
+                                            .font(.custom("PlusJakartaSans-Medium", size: 13))
+                                            .foregroundColor(BridgeColors.text)
+                                        Text("Your Mac briefly joins your phone's private hotspot for files, then rejoins your Wi-Fi.")
+                                            .font(.custom("PlusJakartaSans-Regular", size: 11.5))
+                                            .foregroundColor(BridgeColors.muted)
+                                    }
+                                    Spacer()
+                                    Toggle("", isOn: $fastLinkManager.isFastLinkEnabled)
+                                        .labelsHidden()
+                                        .toggleStyle(BridgeSwitchToggleStyle())
+                                }
 
                                 // System Permissions: shown inside MAC ONLY, and ONLY if NOT active
                                 if !notifManager.isSystemNotificationAllowed {

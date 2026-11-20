@@ -964,6 +964,47 @@
                         android:layout_height="wrap_content"
                         android:checked="true" />
                 </LinearLayout>
+
+                <!-- Fast Transfers (Hotspot) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="4dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Fast transfers (hotspot)"
+                            android:textColor="@color/bridge_text"
+                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Uses a private phone hotspot for files when you're not on the same Wi-Fi. No internet or mobile data used."
+                            android:textColor="@color/bridge_muted"
+                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textSize="12.5sp" />
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchFastLink"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- PHONE ONLY SETTINGS Section Header -->

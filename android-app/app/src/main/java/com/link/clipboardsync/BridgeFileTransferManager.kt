@@ -26,6 +26,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.IOException
 import java.io.RandomAccessFile
 import java.net.Socket
 import java.security.MessageDigest
@@ -88,6 +89,7 @@ class FileTransferItem(
     @Volatile var destinationUri: Uri? = null,
     @Volatile var status: TransferStatus = TransferStatus.WAITING_CONFIRMATION,
     @Volatile var errorMessage: String? = null,
+    @Volatile var statusNote: String? = null,
     @Volatile var offerHost: String? = null,
     @Volatile var offerPort: Int = 0,
     @Volatile var offerToken: String = "",
@@ -272,6 +274,7 @@ object BridgeFileTransferManager {
     fun sendFiles(context: Context, uris: List<Uri>) {
         val appCtx = context.applicationContext
         appContext = appCtx
+        BridgeFastLink.prewarm(appCtx)
         val macName = BridgePrefs.macName(appCtx) ?: "Mac"
         Log.d(TAG, "sendFiles called with ${uris.size} URIs to $macName")
 
@@ -467,6 +470,48 @@ object BridgeFileTransferManager {
         }
     }
 
+    private class DataSocketResult(
+        val socket: Socket,
+        val acquiredHost: String,
+        val viaBluetooth: Boolean
+    )
+
+    /**
+     * Acquires the fast-link data host for [controlHost] and connects the data
+     * socket. A fast-link IP gets 3 quick retries; when all fail the session
+     * is reported failed (hotspot closes, cooldown starts) and the socket
+     * falls back to the Bluetooth relay for this attempt.
+     */
+    private fun openDataSocket(ctx: Context, controlHost: String, port: Int): DataSocketResult {
+        val dataHost = BridgeFastLink.acquireDataHost(ctx, controlHost)
+        val isBt = dataHost == BridgeTransport.BLUETOOTH_HOST
+        val isFastLink = dataHost != controlHost && !isBt
+        if (!isFastLink) {
+            val s = BridgeTransport.connect(ctx, dataHost, port, if (isBt) 15000 else 5000)
+            return DataSocketResult(s, dataHost, isBt)
+        }
+        var lastError: Exception? = null
+        for (attempt in 0 until 3) {
+            try {
+                val s = BridgeTransport.connect(ctx, dataHost, port, 5000)
+                return DataSocketResult(s, dataHost, false)
+            } catch (e: Exception) {
+                lastError = e
+                if (attempt < 2) {
+                    try {
+                        Thread.sleep(800)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                }
+            }
+        }
+        Log.w(TAG, "Fast link data path failed (${lastError?.message}); falling back to Bluetooth relay")
+        BridgeFastLink.reportDataPathFailure()
+        val s = BridgeTransport.connect(ctx, BridgeTransport.BLUETOOTH_HOST, port, 15000)
+        return DataSocketResult(s, dataHost, true)
+    }
+
     private fun startOutgoingStream(
         context: Context,
         item: FileTransferItem,
@@ -480,6 +525,7 @@ object BridgeFileTransferManager {
             cancelledIds.remove(item.id)
             var sock: Socket? = null
             var input: InputStream? = null
+            var dataHost: String? = null
             try {
                 val rawInput: InputStream = if (item.isFolder && item.tempArchiveFile != null) {
                     FileInputStream(item.tempArchiveFile!!)
@@ -499,18 +545,20 @@ object BridgeFileTransferManager {
                 }
                 input = BufferedInputStream(rawInput, CHUNK_SIZE)
 
-                val isBtHost = host == BridgeTransport.BLUETOOTH_HOST
-                val s = BridgeTransport.connect(
-                    context.applicationContext,
-                    host,
-                    port,
-                    if (isBtHost) 15000 else 5000
-                )
+                val appCtx = context.applicationContext
+                if (BridgeFastLink.routeFor(appCtx, host) == BridgeFastLink.DataRoute.FAST_LINK) {
+                    item.statusNote = "Starting fast transfer…"
+                    notifyUi()
+                }
+                val conn = openDataSocket(appCtx, host, port)
+                dataHost = conn.acquiredHost
+                item.statusNote = null
+                val s = conn.socket
                 s.tcpNoDelay = true
                 s.keepAlive = true
                 s.sendBufferSize = SOCKET_BUFFER_SIZE
                 s.receiveBufferSize = SOCKET_BUFFER_SIZE
-                s.soTimeout = if (isBtHost) 45000 else 20000
+                s.soTimeout = if (conn.viaBluetooth) 45000 else 20000
                 sock = s
                 activeSockets[item.id] = s
 
@@ -617,6 +665,7 @@ object BridgeFileTransferManager {
                 dismissProgressNotification(context, item.id)
                 try { input?.close() } catch (_: Exception) {}
                 try { sock?.close() } catch (_: Exception) {}
+                dataHost?.let { BridgeFastLink.releaseDataHost(it) }
                 activeSockets.remove(item.id)
                 if (item.isFolder && (item.status.isFinished || cancelledIds.contains(item.id))) {
                     item.tempArchiveFile?.delete()
@@ -651,6 +700,7 @@ object BridgeFileTransferManager {
                 val isFolder = jsonObj.optBoolean("isFolder", false)
 
                 if (size <= 0L || port <= 0 || token.isBlank() || resolvedHost.isNullOrBlank()) return
+                BridgeFastLink.prewarm(appCtx)
 
                 val cleanName = sanitizeFileName(rawName)
                 val targetFileName = if (isFolder && !cleanName.endsWith(".zip", ignoreCase = true)) "$cleanName.zip" else cleanName
@@ -777,6 +827,7 @@ object BridgeFileTransferManager {
             cancelledIds.remove(item.id)
             var sock: Socket? = null
             var raf: RandomAccessFile? = null
+            var dataHost: String? = null
             try {
                 val partDir = File(appCtx.cacheDir, "transfers").apply { if (!exists()) mkdirs() }
                 val partFile = item.partFile ?: File(partDir, "${item.id}.part").also {
@@ -793,18 +844,19 @@ object BridgeFileTransferManager {
                     }
                 }
 
-                val isBtHost = host == BridgeTransport.BLUETOOTH_HOST
-                val s = BridgeTransport.connect(
-                    appCtx,
-                    host,
-                    port,
-                    if (isBtHost) 15000 else 5000
-                )
+                if (BridgeFastLink.routeFor(appCtx, host) == BridgeFastLink.DataRoute.FAST_LINK) {
+                    item.statusNote = "Starting fast transfer…"
+                    notifyUi()
+                }
+                val conn = openDataSocket(appCtx, host, port)
+                dataHost = conn.acquiredHost
+                item.statusNote = null
+                val s = conn.socket
                 s.tcpNoDelay = true
                 s.keepAlive = true
                 s.sendBufferSize = SOCKET_BUFFER_SIZE
                 s.receiveBufferSize = SOCKET_BUFFER_SIZE
-                s.soTimeout = if (isBtHost) 45000 else 20000
+                s.soTimeout = if (conn.viaBluetooth) 45000 else 20000
                 sock = s
                 activeSockets[item.id] = s
 
@@ -1018,10 +1070,14 @@ object BridgeFileTransferManager {
                 dismissProgressNotification(context, item.id)
                 try { raf?.close() } catch (_: Exception) {}
                 try { sock?.close() } catch (_: Exception) {}
+                dataHost?.let { BridgeFastLink.releaseDataHost(it) }
                 activeSockets.remove(item.id)
             }
         }
     }
+
+    /** True while any transfer (including pending confirmations) is in flight. */
+    fun hasActiveTransfers(): Boolean = transfers.any { it.status.isActive }
 
     // MARK: - Pause / Resume / Cancel
 

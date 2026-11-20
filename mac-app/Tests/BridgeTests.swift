@@ -465,6 +465,81 @@ private func runBluetoothRelayHeaderTests() {
     expect(BridgeBluetoothRelay.parseRelayHeader(Data("{\"relay\":65535}\n".utf8))?.port == 65535, "Max valid port should parse")
 }
 
+private func runFastLinkManagerTests() {
+    // parseOffer: valid offer
+    let valid: [String: Any] = [
+        "type": "fastlink_offer",
+        "session": "sess-1234-abcd",
+        "ssid": "AndroidShare_1234",
+        "psk": "correct horse battery"
+    ]
+    let offer = BridgeFastLinkManager.parseOffer(valid)
+    expect(offer?.session == "sess-1234-abcd", "Valid offer should parse session")
+    expect(offer?.ssid == "AndroidShare_1234", "Valid offer should parse ssid")
+    expect(offer?.psk == "correct horse battery", "Valid offer should parse psk")
+
+    // Bad session shapes
+    var bad = valid
+    bad["session"] = "short"
+    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "Session under 8 chars must not parse")
+    bad["session"] = String(repeating: "a", count: 65)
+    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "Session over 64 chars must not parse")
+    bad["session"] = "sess 1234 ab" // space not allowed
+    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "Session with space must not parse")
+
+    // SSID length: 0 bytes and 33 bytes rejected
+    bad = valid
+    bad["ssid"] = ""
+    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "Empty ssid must not parse")
+    bad["ssid"] = String(repeating: "s", count: 33)
+    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "SSID over 32 bytes must not parse")
+    bad["ssid"] = String(repeating: "é", count: 17) // 34 utf8 bytes
+    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "SSID over 32 utf8 bytes must not parse")
+
+    // PSK: 7 chars rejected, 64 hex ok, 64 non-hex rejected
+    bad = valid
+    bad["psk"] = "1234567"
+    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "PSK under 8 chars must not parse")
+    bad["psk"] = String(repeating: "a", count: 64) // valid hex
+    expect(BridgeFastLinkManager.parseOffer(bad) != nil, "64-hex PSK should parse")
+    bad["psk"] = String(repeating: "g", count: 64) // non-hex
+    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "64 non-hex PSK must not parse")
+    bad["psk"] = String(repeating: "z", count: 63) // 63 non-hex chars is still a valid passphrase
+    expect(BridgeFastLinkManager.parseOffer(bad) != nil, "63-char PSK should parse")
+
+    // isUsableHotspotIPv4
+    expect(BridgeFastLinkManager.isUsableHotspotIPv4("192.168.43.12"), "192.168.x should be usable")
+    expect(BridgeFastLinkManager.isUsableHotspotIPv4("10.0.0.5"), "10.x should be usable")
+    expect(BridgeFastLinkManager.isUsableHotspotIPv4("172.20.1.2"), "172.16-31.x should be usable")
+    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("127.0.0.1"), "Loopback must not be usable")
+    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("169.254.1.1"), "Link-local must not be usable")
+    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("8.8.8.8"), "Public IP must not be usable")
+    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("172.15.0.1"), "172.15.x is outside RFC1918")
+    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("not-an-ip"), "Non-IP must not be usable")
+
+    // restorePlan branches
+    if case .rejoin(let ssid) = BridgeFastLinkManager.restorePlan(previousSSID: "HomeWiFi", wasOnWifi: true) {
+        expect(ssid == "HomeWiFi", "restorePlan should rejoin previous SSID")
+    } else {
+        expect(false, "restorePlan with previousSSID should be .rejoin")
+    }
+    if case .powerCycle = BridgeFastLinkManager.restorePlan(previousSSID: nil, wasOnWifi: true) {
+        // expected
+    } else {
+        expect(false, "restorePlan nil SSID + wasOnWifi should be .powerCycle")
+    }
+    if case .disassociateOnly = BridgeFastLinkManager.restorePlan(previousSSID: nil, wasOnWifi: false) {
+        // expected
+    } else {
+        expect(false, "restorePlan nil SSID + !wasOnWifi should be .disassociateOnly")
+    }
+    if case .rejoin(let ssid) = BridgeFastLinkManager.restorePlan(previousSSID: "  ", wasOnWifi: false) {
+        expect(ssid == "  ", "Whitespace SSID still counts as present")
+    } else {
+        expect(false, "Whitespace-only SSID should still rejoin (ssid() returned it)")
+    }
+}
+
 private func containsScrollView(_ view: NSView) -> Bool {
     if view is NSScrollView { return true }
     return view.subviews.contains(where: containsScrollView)
@@ -535,6 +610,7 @@ struct BridgeTestRunner {
         runSpekeAndSessionCipherTests()
         runHandshakeGateTests()
         runBluetoothRelayHeaderTests()
+        runFastLinkManagerTests()
         runNotificationScrollLayoutTests()
         do {
             try runPayloadAndVersionTests()

@@ -19,7 +19,13 @@ class BridgeModel: ObservableObject {
     @Published var copiedNotice: Bool = false
     @Published var connectedDevicesList: [ConnectedDeviceInfo] = []
     @Published var selectedTargetDeviceId: UUID? = nil
-    @Published var isDropTargeted: Bool = false
+    @Published var isDropTargeted: Bool = false {
+        didSet {
+            if isDropTargeted {
+                prewarmFastLinkIfBluetooth()
+            }
+        }
+    }
     @Published var deviceToUnpair: ConnectedDeviceInfo? = nil
     @Published var revealedDeviceIpIds: Set<UUID> = []
     @Published var isLocalIpRevealed: Bool = false
@@ -80,6 +86,7 @@ class BridgeModel: ObservableObject {
         if startServer {
             server.start()
             BridgeBluetoothRelay.shared.start()
+            BridgeFastLinkManager.shared.requestLocationAuthorizationIfNeeded()
         }
 
         BridgeNotificationManager.shared.$activeNotifications
@@ -287,11 +294,22 @@ class BridgeModel: ObservableObject {
         return pairedDevice ?? "Android"
     }
 
+    /// Sends the fast-link pre-warm hint when the drop target is on Bluetooth.
+    private func prewarmFastLinkIfBluetooth() {
+        let target = connectedDevicesList.first(where: { $0.id == selectedTargetDeviceId })
+            ?? connectedDevicesList.first
+        guard let target = target, target.ip == "Bluetooth" else { return }
+        BridgeFastLinkManager.shared.sendPrewarmRequest(toDeviceId: target.id)
+    }
+
     func sendFiles(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
         let targetDev = connectedDevicesList.first(where: { $0.id == selectedTargetDeviceId })
             ?? connectedDevicesList.first
             ?? ConnectedDeviceInfo(id: UUID(), name: connectedDevice ?? pairedDevice ?? "Android", ip: nil, isConnected: isConnected)
+        if targetDev.ip == "Bluetooth" {
+            BridgeFastLinkManager.shared.sendPrewarmRequest(toDeviceId: targetDev.id)
+        }
         BridgeFileTransferManager.shared.sendFiles(urls: urls, to: targetDev)
     }
 

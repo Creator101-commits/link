@@ -28,6 +28,10 @@
     <string>NSApplication</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Bridge uses Bluetooth to connect to your Android phone directly, without Wi-Fi or internet.</string>
+    <key>NSLocationUsageDescription</key>
+    <string>Bridge uses Location only to read and switch Wi-Fi networks for fast offline file transfers. Your location is never used or stored.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Bridge uses Location only to read and switch Wi-Fi networks for fast offline file transfers. Your location is never used or stored.</string>
     <key>NSDesktopFolderUsageDescription</key>
     <string>Allow Bridge to send files from your Desktop folder to your Android phone.</string>
     <key>NSDocumentsFolderUsageDescription</key>

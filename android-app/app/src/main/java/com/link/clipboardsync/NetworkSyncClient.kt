@@ -14,6 +14,7 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.io.PrintWriter
 import java.math.BigInteger
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.security.MessageDigest
@@ -334,6 +335,11 @@ class NetworkSyncClient(private val context: Context) {
         private set
     private var failedAttempts: Int = 0
 
+    // Transport failover / auto-upgrade state
+    @Volatile private var lastAttemptWasLan = false
+    @Volatile private var upgradingToLan = false
+    @Volatile private var lastLanProbeMs = 0L
+
     // mDNS Discovery
     private var nsdManager: NsdManager? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
@@ -507,6 +513,18 @@ class NetworkSyncClient(private val context: Context) {
                     if (heartbeatTick % 3 == 0) {
                         BridgeNotificationListenerService.instance?.syncActiveIdsOnly()
                     }
+                    // ~60s (20 x 3s ticks): NSD reports a service only once and
+                    // discovery usually stops after resolve, so while on
+                    // Bluetooth restart it to give the LAN upgrade probe
+                    // another chance.
+                    if (heartbeatTick % 20 == 0 &&
+                        isConnectedViaBluetooth() &&
+                        hasWifiOrEthernetTransport() &&
+                        !BridgeFastLink.isActive() &&
+                        !BridgeFileTransferManager.hasActiveTransfers()) {
+                        stopDiscovery()
+                        startDiscovery()
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "Heartbeat ping failed: ${e.message}")
                     disconnectSocket()
@@ -544,7 +562,6 @@ class NetworkSyncClient(private val context: Context) {
         if (readThread?.isAlive == true) return
         val t = Thread({
             var discoveryWaitCount = 0
-            var lastAttemptWasLan = false
             while (isRunning.get()) {
                 val lan = lanHost?.takeIf { isUsableLanHost(it) }
                 val wifiUp = hasWifiOrEthernetTransport()
@@ -576,6 +593,7 @@ class NetworkSyncClient(private val context: Context) {
                 }
                 discoveryWaitCount = 0
                 lastAttemptWasLan = host != BridgeTransport.BLUETOOTH_HOST
+                upgradingToLan = false
                 currentHost = host
 
                 try {
@@ -708,7 +726,9 @@ class NetworkSyncClient(private val context: Context) {
                                 val innerObj = try { JSONObject(decryptedJsonString) } catch (e: Exception) { null }
                                 val innerType = innerObj?.optString("type")
 
-                                if (innerType != null && (innerType.startsWith("notif_") || innerType == "settings_sync")) {
+                                if (innerType != null && innerType.startsWith("fastlink_") && innerObj != null) {
+                                    BridgeFastLink.handleControlMessage(context, innerObj)
+                                } else if (innerType != null && (innerType.startsWith("notif_") || innerType == "settings_sync")) {
                                     notifyNotificationPayloadReceived(decryptedJsonString)
                                 } else if (innerType != null && innerType.startsWith("file_") && innerObj != null) {
                                     BridgeFileTransferManager.handleControlMessage(context, innerObj, host)
@@ -752,14 +772,23 @@ class NetworkSyncClient(private val context: Context) {
                     }
                 } catch (e: Exception) {
                     if (isRunning.get()) {
-                        log("Connection dropped or failed: ${e.message}")
-                        failedAttempts++
-                        notifyConnectionFailed(failedAttempts)
+                        if (upgradingToLan) {
+                            // Deliberate socket close to switch Bluetooth -> LAN;
+                            // not a failure, so no error surface.
+                            log("Switching to Wi-Fi…")
+                        } else {
+                            log("Connection dropped or failed: ${e.message}")
+                            failedAttempts++
+                            notifyConnectionFailed(failedAttempts)
+                        }
                     }
                 } finally {
                     stopHeartbeat()
                     disconnectSocket()
-                    notifyConnectionStatusChanged(false, if (BridgePrefs.isPaired(context)) host else null)
+                    BridgeFastLink.onControlDisconnected()
+                    if (!upgradingToLan) {
+                        notifyConnectionStatusChanged(false, if (BridgePrefs.isPaired(context)) host else null)
+                    }
                 }
 
                 if (isRunning.get()) {
@@ -849,17 +878,30 @@ class NetworkSyncClient(private val context: Context) {
                         }
 
                         override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                            // While a fast-link session is up the Mac sits on the
+                            // phone hotspot; its home-Wi-Fi address must not be
+                            // adopted as the LAN host mid-transfer.
+                            if (BridgeFastLink.isActive()) return
                             val host = serviceInfo.host?.hostAddress
                             val port = serviceInfo.port
-                            if (!host.isNullOrBlank() && !host.contains(":") && isUsableLanHost(host) && port in 1024..65535) {
-                                log("Found Mac candidate at $host:$port")
-                                lanHost = host
-                                currentPort = port
-                                failedAttempts = 0
-                                stopDiscovery()
-                                if (!pairCode.isNullOrBlank()) {
-                                    connectLoop()
-                                }
+                            if (host.isNullOrBlank() || host.contains(":") ||
+                                !isUsableLanHost(host) || port !in 1024..65535 ||
+                                host == BridgeFastLink.currentMacIp()) return
+                            if (isConnectedViaBluetooth() &&
+                                hasWifiOrEthernetTransport() &&
+                                !BridgeFileTransferManager.hasActiveTransfers()) {
+                                // Both sides share Wi-Fi: probe, then upgrade the
+                                // control channel from Bluetooth to LAN.
+                                maybeUpgradeToLan(host, port)
+                                return
+                            }
+                            log("Found Mac candidate at $host:$port")
+                            lanHost = host
+                            currentPort = port
+                            failedAttempts = 0
+                            stopDiscovery()
+                            if (!pairCode.isNullOrBlank()) {
+                                connectLoop()
                             }
                         }
                     })
@@ -887,6 +929,35 @@ class NetworkSyncClient(private val context: Context) {
         } catch (e: Exception) {
             log("Failed to start Bonjour discovery: ${e.message}")
         }
+    }
+
+    /**
+     * Auto-upgrade: connected over Bluetooth but a usable LAN host resolved via
+     * Bonjour. Probes host:port once (rate-limited), then closes the Bluetooth
+     * control socket so the next connectLoop iteration dials LAN.
+     */
+    private fun maybeUpgradeToLan(host: String, port: Int) {
+        val now = System.currentTimeMillis()
+        if (now - lastLanProbeMs < 30_000) return
+        lastLanProbeMs = now
+        Thread({
+            try {
+                Socket().use { it.connect(InetSocketAddress(host, port), 1500) }
+            } catch (e: Exception) {
+                return@Thread
+            }
+            // Re-verify nothing changed while probing.
+            if (!isConnectedViaBluetooth() ||
+                BridgeFastLink.isActive() ||
+                BridgeFileTransferManager.hasActiveTransfers()) return@Thread
+            lanHost = host
+            currentPort = port
+            failedAttempts = 0
+            lastAttemptWasLan = false
+            upgradingToLan = true
+            log("Mac found on Wi-Fi; upgrading connection from Bluetooth")
+            disconnectSocket()
+        }, "lan-upgrade-probe").apply { isDaemon = true }.start()
     }
 
     private fun stopDiscovery() {

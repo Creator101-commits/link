@@ -369,6 +369,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         return true
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        BridgeFastLinkManager.shared.applicationTerminating()
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         var fileUrls: [URL] = []
         for url in urls {

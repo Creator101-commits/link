@@ -1062,6 +1062,15 @@ class BridgeFileTransferManager: ObservableObject {
         return transferQueue.sync(execute: matches)
     }
 
+    /// True while any file-transfer session exists (used by the fast-link watchdog).
+    func hasActiveSessions() -> Bool {
+        let check: () -> Bool = { !self.activeSessions.isEmpty }
+        if DispatchQueue.getSpecific(key: Self.transferQueueKey) == true {
+            return check()
+        }
+        return transferQueue.sync(execute: check)
+    }
+
     private func cleanupSession(transferId: String) {
         if let session = activeSessions.removeValue(forKey: transferId) {
             try? session.fileHandle?.close()

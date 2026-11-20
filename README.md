@@ -53,6 +53,8 @@ This fork works with **no Wi-Fi and no internet**: Bridge can connect your Andro
 - Pairing is unchanged — scan the same QR code. The phone prefers Wi-Fi when available and falls back to Bluetooth automatically.
 - Bluetooth is noticeably slower for big files, so Wi-Fi remains the preferred transport whenever it's up.
 
+**Fast transfers:** when the control channel is on Bluetooth (devices not on the same Wi-Fi), clipboard, notifications, and control stay on Bluetooth while file transfers get a speed boost — the phone spins up a private **LocalOnlyHotspot** (no internet, no mobile data), hands the Mac its SSID/passphrase over the encrypted control channel, the Mac briefly joins that hotspot via CoreWLAN, files fly over the Wi-Fi link, and the Mac automatically rejoins its previous Wi-Fi afterward. If the fast link can't be established for any reason, transfers silently fall back to the Bluetooth relay. When both devices later land on the same Wi-Fi, the control channel upgrades to LAN automatically. A "Fast transfers (hotspot)" toggle on Android and "Fast transfers via phone hotspot" on the Mac Settings tab control the feature (both on by default).
+
 > This repository is a fork of [`badruddin-tasnim/bridge`](https://github.com/badruddin-tasnim/bridge) (MIT License).
 
 ---

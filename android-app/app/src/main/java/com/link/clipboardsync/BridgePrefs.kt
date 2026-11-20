@@ -23,6 +23,7 @@ object BridgePrefs {
     private const val KEY_CUSTOM_SAVE_TREE_URI = "custom_save_tree_uri"
     private const val KEY_CUSTOM_SAVE_DISPLAY_NAME = "custom_save_display_name"
     private const val KEY_BT_ID = "mac_bt_id"
+    private const val KEY_FAST_LINK_ENABLED = "fast_link_enabled"
 
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -104,6 +105,15 @@ object BridgePrefs {
             editor.putLong(KEY_SETTINGS_UPDATED_AT, System.currentTimeMillis())
         }
         editor.apply()
+    }
+
+    // Local-only setting: route file data over a private phone hotspot when the
+    // control channel is on Bluetooth. Not synced to the Mac (it has its own).
+    fun isFastLinkEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_FAST_LINK_ENABLED, true)
+
+    fun setFastLinkEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_FAST_LINK_ENABLED, enabled).apply()
     }
 
     // Phone-Only Setting: Preferred Save Location for received files

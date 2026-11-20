@@ -1114,6 +1114,7 @@ class BridgeServer {
         connectionCreatedAt.removeValue(forKey: id)
         connectionRemoteIp.removeValue(forKey: id)
         if wasAuthenticated {
+            BridgeFastLinkManager.shared.controlConnectionClosed(deviceId: id)
             notifyUiStatus()
         }
     }
@@ -1299,6 +1300,11 @@ class BridgeServer {
             return
         }
 
+        if type.hasPrefix("fastlink_") {
+            BridgeFastLinkManager.shared.handleControlMessage(jsonObject, fromDeviceId: id)
+            return
+        }
+
         if type.hasPrefix("notif_") || type == "settings_sync" {
             NSLog("[BridgeServer] Routing payload of type '%@' to BridgeNotificationManager", type)
             BridgeNotificationManager.shared.handleIncomingPayload(data: data)
@@ -1406,6 +1412,12 @@ class BridgeServer {
     /// Connections arriving through the Bluetooth L2CAP relay show up as
     /// loopback TCP; label them "Bluetooth" instead of an IP. Evaluated at
     /// display time so the relay's ephemeral port is always registered by then.
+    /// True when this connection id is an authenticated Bluetooth-relayed client.
+    func isBluetoothRelayDevice(_ id: UUID) -> Bool {
+        guard let conn = connections[id] else { return false }
+        return isBluetoothRelayConnection(conn)
+    }
+
     private func displayedAddress(forConnectionId id: UUID) -> String? {
         if let conn = connections[id], isBluetoothRelayConnection(conn) {
             return "Bluetooth"

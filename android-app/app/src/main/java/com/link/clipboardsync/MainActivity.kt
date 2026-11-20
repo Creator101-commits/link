@@ -129,6 +129,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private lateinit var rowPhoneVibrate: LinearLayout
     private lateinit var switchPhoneVibrate: SwitchCompat
     private lateinit var switchAutoAcceptFiles: SwitchCompat
+    private lateinit var switchFastLink: SwitchCompat
     private lateinit var rowSaveLocation: LinearLayout
     private lateinit var tvSaveLocationPath: TextView
     private lateinit var btnResetSaveLocation: TextView
@@ -410,6 +411,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         btnResetSaveLocation = findViewById(R.id.btnResetSaveLocation)
         btnChangeSaveLocation = findViewById(R.id.btnChangeSaveLocation)
         switchAutoAcceptFiles = findViewById(R.id.switchAutoAcceptFiles)
+        switchFastLink = findViewById(R.id.switchFastLink)
         rowSettingNotifAccess = findViewById(R.id.rowSettingNotifAccess)
         tvSettingNotifAccessStatus = findViewById(R.id.tvSettingNotifAccessStatus)
         rowSettingAccessibility = findViewById(R.id.rowSettingAccessibility)
@@ -424,6 +426,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         styleBridgeSwitch(switchMacNotif)
         styleBridgeSwitch(switchPhoneVibrate)
         styleBridgeSwitch(switchAutoAcceptFiles)
+        styleBridgeSwitch(switchFastLink)
 
         // Screen B
         layoutScreenPairing = findViewById(R.id.layoutScreenPairing)
@@ -702,6 +705,15 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             BridgePrefs.setAutoAcceptFilesEnabled(this, isChecked, updateTimestamp = true)
             BridgeNotificationManager.sendSettingsToMac(this)
             updateSettingsUI()
+        }
+
+        switchFastLink.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
+            BridgePrefs.setFastLinkEnabled(this, isChecked)
+            if (isChecked) {
+                BridgeFastLink.clearFailureCooldown()
+                ensureBluetoothPermissions()
+            }
         }
 
         btnScanQr.setOnClickListener {
@@ -1025,6 +1037,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             switchMacNotif.isChecked = macEnabled
             switchPhoneVibrate.isChecked = vibrateEnabled
             switchAutoAcceptFiles.isChecked = autoAcceptFiles
+            switchFastLink.isChecked = BridgePrefs.isFastLinkEnabled(this)
 
             switchAndroidNotif.isEnabled = masterEnabled
             switchMacNotif.isEnabled = masterEnabled
@@ -1233,7 +1246,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             val subtitleText = when (item.status) {
                 TransferStatus.HASHING -> if (item.isFolder) "Packaging folder…" else "${item.formattedTotalSize} · Preparing…"
                 TransferStatus.WAITING_CONFIRMATION -> {
-                    if (item.direction == TransferDirection.INCOMING) {
+                    item.statusNote ?: if (item.direction == TransferDirection.INCOMING) {
                         "${item.formattedTotalSize} · From ${item.deviceName}"
                     } else {
                         "${item.formattedTotalSize} · Connecting to ${item.deviceName}…"
@@ -1757,22 +1770,35 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private val bluetoothPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
-        if (grants.values.all { it } && BridgePrefs.isPaired(this)) {
-            ClipboardSyncManager.reconnect(this)
+        if (grants.values.all { it }) {
+            BridgeFastLink.clearFailureCooldown()
+            if (BridgePrefs.isPaired(this)) {
+                ClipboardSyncManager.reconnect(this)
+            }
         }
     }
 
     private fun missingBluetoothPermissions(): List<String> {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyList()
-        val needed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
-        } else {
-            listOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
+        val needed = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                needed += Manifest.permission.BLUETOOTH_SCAN
+                needed += Manifest.permission.BLUETOOTH_CONNECT
+            } else {
+                needed += Manifest.permission.ACCESS_FINE_LOCATION
+                needed += Manifest.permission.ACCESS_COARSE_LOCATION
+            }
         }
-        return needed.filter {
+        // Fast transfers need hotspot permissions too when enabled.
+        if (BridgePrefs.isFastLinkEnabled(this) && BridgeFastLink.isSupported(this)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                needed += Manifest.permission.NEARBY_WIFI_DEVICES
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                needed += Manifest.permission.ACCESS_FINE_LOCATION
+                needed += Manifest.permission.ACCESS_COARSE_LOCATION
+            }
+        }
+        return needed.distinct().filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
     }
