@@ -21,7 +21,7 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-class BridgeCoreUnitTest {
+class LinkCoreUnitTest {
 
     @Test
     fun isPrivateLocalAddress_acceptsPrivateAndLoopback_rejectsPublicAndMalformed() {
@@ -106,23 +106,23 @@ class BridgeCoreUnitTest {
 
     @Test
     fun sanitizeFileName_blocksTraversalAndInvalidNames() {
-        assertEquals("passwd", BridgeFileTransferManager.sanitizeFileName("../../../../etc/passwd"))
-        assertEquals("TransferredFile", BridgeFileTransferManager.sanitizeFileName(".."))
-        assertEquals("TransferredFile", BridgeFileTransferManager.sanitizeFileName("."))
-        assertEquals("TransferredFile", BridgeFileTransferManager.sanitizeFileName("   "))
-        assertEquals("_hidden", BridgeFileTransferManager.sanitizeFileName(".hidden"))
-        assertEquals("report.pdf", BridgeFileTransferManager.sanitizeFileName("report\u0000.pdf"))
-        assertFalse(BridgeFileTransferManager.sanitizeFileName("..\\..\\evil.txt").contains("\\"))
+        assertEquals("passwd", LinkFileTransferManager.sanitizeFileName("../../../../etc/passwd"))
+        assertEquals("TransferredFile", LinkFileTransferManager.sanitizeFileName(".."))
+        assertEquals("TransferredFile", LinkFileTransferManager.sanitizeFileName("."))
+        assertEquals("TransferredFile", LinkFileTransferManager.sanitizeFileName("   "))
+        assertEquals("_hidden", LinkFileTransferManager.sanitizeFileName(".hidden"))
+        assertEquals("report.pdf", LinkFileTransferManager.sanitizeFileName("report\u0000.pdf"))
+        assertFalse(LinkFileTransferManager.sanitizeFileName("..\\..\\evil.txt").contains("\\"))
     }
 
     @Test
     fun deriveAesKey_and_aesGcmRoundTrip_detectsTampering() {
-        val key = BridgeFileTransferManager.deriveAesKey("sample-transfer-token")
+        val key = LinkFileTransferManager.deriveAesKey("sample-transfer-token")
         assertEquals("AES", key.algorithm)
         assertEquals(32, key.encoded.size) // 256-bit AES key
 
         val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
-        val plaintext = "Bridge encrypted file chunk payload".toByteArray(Charsets.UTF_8)
+        val plaintext = "Link encrypted file chunk payload".toByteArray(Charsets.UTF_8)
 
         val encCipher = Cipher.getInstance("AES/GCM/NoPadding")
         encCipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
@@ -148,26 +148,26 @@ class BridgeCoreUnitTest {
 
     @Test
     fun fileTransferHelpers_detectExecutablesAndOsMetadata() {
-        assertTrue(BridgeFileTransferManager.isExecutable("app.APK"))
-        assertTrue(BridgeFileTransferManager.isExecutable("run.sh"))
-        assertTrue(BridgeFileTransferManager.isExecutable("setup.exe"))
-        assertTrue(BridgeFileTransferManager.isExecutable("autorun.command"))
-        assertTrue(BridgeFileTransferManager.isExecutable("payload.workflow"))
-        assertTrue(BridgeFileTransferManager.isExecutable("script.scpt"))
-        assertTrue(BridgeFileTransferManager.isExecutable("agent.py"))
-        assertTrue(BridgeFileTransferManager.isExecutable("launcher.jar"))
-        assertTrue(BridgeFileTransferManager.isExecutable("phish.webloc"))
-        assertFalse(BridgeFileTransferManager.isExecutable("photo.jpg"))
-        assertFalse(BridgeFileTransferManager.isExecutable("notes.pdf"))
+        assertTrue(LinkFileTransferManager.isExecutable("app.APK"))
+        assertTrue(LinkFileTransferManager.isExecutable("run.sh"))
+        assertTrue(LinkFileTransferManager.isExecutable("setup.exe"))
+        assertTrue(LinkFileTransferManager.isExecutable("autorun.command"))
+        assertTrue(LinkFileTransferManager.isExecutable("payload.workflow"))
+        assertTrue(LinkFileTransferManager.isExecutable("script.scpt"))
+        assertTrue(LinkFileTransferManager.isExecutable("agent.py"))
+        assertTrue(LinkFileTransferManager.isExecutable("launcher.jar"))
+        assertTrue(LinkFileTransferManager.isExecutable("phish.webloc"))
+        assertFalse(LinkFileTransferManager.isExecutable("photo.jpg"))
+        assertFalse(LinkFileTransferManager.isExecutable("notes.pdf"))
 
-        assertTrue(BridgeFileTransferManager.isIgnoredMetadata(".DS_Store"))
-        assertTrue(BridgeFileTransferManager.isIgnoredMetadata("__MACOSX"))
-        assertTrue(BridgeFileTransferManager.isIgnoredMetadata("._document.pdf"))
-        assertFalse(BridgeFileTransferManager.isIgnoredMetadata("document.pdf"))
+        assertTrue(LinkFileTransferManager.isIgnoredMetadata(".DS_Store"))
+        assertTrue(LinkFileTransferManager.isIgnoredMetadata("__MACOSX"))
+        assertTrue(LinkFileTransferManager.isIgnoredMetadata("._document.pdf"))
+        assertFalse(LinkFileTransferManager.isIgnoredMetadata("document.pdf"))
 
         assertEquals(
             "abedb85429f8107b6dbb1a10dd1ca078d232b7f52f1e8f621cfb5b23f613e34e",
-            BridgeFileTransferManager.computeDataSocketAuth("sample-transfer-token", "tx_12345", 65536L)
+            LinkFileTransferManager.computeDataSocketAuth("sample-transfer-token", "tx_12345", 65536L)
         )
     }
 
@@ -181,19 +181,19 @@ class BridgeCoreUnitTest {
         val clientScalar = BigInteger(1, md.digest("deterministic-client-scalar".toByteArray(Charsets.UTF_8)))
         val serverScalar = BigInteger(1, md.digest("deterministic-server-scalar".toByteArray(Charsets.UTF_8)))
 
-        val clientKP = BridgeSpeke.generateKeyPair(code, clientNonce, clientScalar)
-        val serverKP = BridgeSpeke.generateKeyPair(code, clientNonce, serverScalar)
+        val clientKP = LinkSpeke.generateKeyPair(code, clientNonce, clientScalar)
+        val serverKP = LinkSpeke.generateKeyPair(code, clientNonce, serverScalar)
 
         assertTrue(clientKP.publicHex.startsWith("1b4f3adc32b2cd3737115a7a07b5579d483b136f1784520dd2fd505aa2ec9b4f"))
         assertTrue(serverKP.publicHex.startsWith("3304c34f377eb869ab75eade3a1f7b8e117a73d6f380825895d60e4b0eb5496a"))
 
-        val clientShared = BridgeSpeke.computeSharedSecret(serverKP.publicHex, clientKP.privateScalar)
-        val serverShared = BridgeSpeke.computeSharedSecret(clientKP.publicHex, serverKP.privateScalar)
+        val clientShared = LinkSpeke.computeSharedSecret(serverKP.publicHex, clientKP.privateScalar)
+        val serverShared = LinkSpeke.computeSharedSecret(clientKP.publicHex, serverKP.privateScalar)
         assertNotNull(clientShared)
         assertEquals(clientShared, serverShared)
         assertTrue(clientShared!!.startsWith("129b5d17f6f0fb9fe3ae58cae7230fa8c4e1b0dfabf044c52005c6e3781f001f"))
 
-        val material = BridgeSpeke.deriveSessionMaterial(
+        val material = LinkSpeke.deriveSessionMaterial(
             sharedSecretHex = clientShared,
             pairingCode = code,
             clientNonce = clientNonce,
@@ -205,9 +205,9 @@ class BridgeCoreUnitTest {
         assertEquals("13e5e9de0452dc3611549979cea6eb3f9a5517f81f8273e85535abf06ed3fcf5", material.serverProof)
 
         // Wrong pairing code produces different proofs
-        val wrongKP = BridgeSpeke.generateKeyPair("999999", clientNonce, clientScalar)
-        val wrongShared = BridgeSpeke.computeSharedSecret(serverKP.publicHex, wrongKP.privateScalar)!!
-        val wrongMaterial = BridgeSpeke.deriveSessionMaterial(
+        val wrongKP = LinkSpeke.generateKeyPair("999999", clientNonce, clientScalar)
+        val wrongShared = LinkSpeke.computeSharedSecret(serverKP.publicHex, wrongKP.privateScalar)!!
+        val wrongMaterial = LinkSpeke.deriveSessionMaterial(
             sharedSecretHex = wrongShared,
             pairingCode = "999999",
             clientNonce = clientNonce,
@@ -218,8 +218,8 @@ class BridgeCoreUnitTest {
         assertNotEquals(material.clientProof, wrongMaterial.clientProof)
 
         // Reject trivial / invalid group elements (0, 1, p-1)
-        assertNull(BridgeSpeke.computeSharedSecret("0".repeat(512), clientKP.privateScalar))
-        assertNull(BridgeSpeke.computeSharedSecret("0".repeat(511) + "1", clientKP.privateScalar))
+        assertNull(LinkSpeke.computeSharedSecret("0".repeat(512), clientKP.privateScalar))
+        assertNull(LinkSpeke.computeSharedSecret("0".repeat(511) + "1", clientKP.privateScalar))
     }
 
     @Test
@@ -229,7 +229,7 @@ class BridgeCoreUnitTest {
         val c2sKey = SecretKeySpec(md.digest("c2s-key".toByteArray(Charsets.UTF_8)), "AES")
         val s2cKey = SecretKeySpec(md.digest("s2c-key".toByteArray(Charsets.UTF_8)), "AES")
 
-        val vecCipher = BridgeSessionCipher(
+        val vecCipher = LinkSessionCipher(
             sendKey = testKey,
             receiveKey = testKey,
             sendDirection = "c2s",
@@ -244,8 +244,8 @@ class BridgeCoreUnitTest {
         )
         assertEquals("""{"type":"clip","text":"secret hello"}""", vecCipher.open(vecObj))
 
-        val clientCipher = BridgeSessionCipher(c2sKey, s2cKey, "c2s", "s2c")
-        val serverCipher = BridgeSessionCipher(s2cKey, c2sKey, "s2c", "c2s")
+        val clientCipher = LinkSessionCipher(c2sKey, s2cKey, "c2s", "s2c")
+        val serverCipher = LinkSessionCipher(s2cKey, c2sKey, "s2c", "c2s")
 
         val frame1 = clientCipher.seal("""{"type":"clip","text":"one"}""")
         val frame2 = clientCipher.seal("""{"type":"clip","text":"two"}""")
@@ -260,7 +260,7 @@ class BridgeCoreUnitTest {
         // Replay of seq 1 must be rejected
         assertNull(serverCipher.open(obj1))
         // Reflection attack (feeding client's c2s frame back into client's s2c receiver) must fail
-        val clientMirror = BridgeSessionCipher(c2sKey, c2sKey, "c2s", "s2c")
+        val clientMirror = LinkSessionCipher(c2sKey, c2sKey, "c2s", "s2c")
         assertNull(clientMirror.open(obj1))
     }
 
@@ -268,14 +268,14 @@ class BridgeCoreUnitTest {
     fun bridgeTransport_buildRelayHeader_and_parseMacInfo() {
         assertArrayEquals(
             "{\"relay\":8765}\n".toByteArray(Charsets.UTF_8),
-            BridgeTransport.buildRelayHeader(8765)
+            LinkTransport.buildRelayHeader(8765)
         )
         assertArrayEquals(
             "{\"relay\":54321}\n".toByteArray(Charsets.UTF_8),
-            BridgeTransport.buildRelayHeader(54321)
+            LinkTransport.buildRelayHeader(54321)
         )
 
-        val valid = BridgeTransport.parseMacInfo(
+        val valid = LinkTransport.parseMacInfo(
             """{"psm":49153,"id":"a1b2c3d4","name":"MacBook Pro"}"""
         )
         assertNotNull(valid)
@@ -283,53 +283,53 @@ class BridgeCoreUnitTest {
         assertEquals("a1b2c3d4", valid.id)
         assertEquals("MacBook Pro", valid.name)
 
-        assertNull(BridgeTransport.parseMacInfo("not json"))
-        assertNull(BridgeTransport.parseMacInfo("""{"psm":0,"id":"a1b2c3d4","name":"x"}"""))
-        assertNull(BridgeTransport.parseMacInfo("""{"psm":70000,"id":"a1b2c3d4","name":"x"}"""))
-        assertNull(BridgeTransport.parseMacInfo("""{"psm":1234,"id":"A1B2C3D4","name":"x"}"""))
-        assertNull(BridgeTransport.parseMacInfo("""{"psm":1234,"id":"xyz","name":"x"}"""))
-        assertNull(BridgeTransport.parseMacInfo("""{"id":"a1b2c3d4","name":"x"}"""))
+        assertNull(LinkTransport.parseMacInfo("not json"))
+        assertNull(LinkTransport.parseMacInfo("""{"psm":0,"id":"a1b2c3d4","name":"x"}"""))
+        assertNull(LinkTransport.parseMacInfo("""{"psm":70000,"id":"a1b2c3d4","name":"x"}"""))
+        assertNull(LinkTransport.parseMacInfo("""{"psm":1234,"id":"A1B2C3D4","name":"x"}"""))
+        assertNull(LinkTransport.parseMacInfo("""{"psm":1234,"id":"xyz","name":"x"}"""))
+        assertNull(LinkTransport.parseMacInfo("""{"id":"a1b2c3d4","name":"x"}"""))
 
-        assertTrue(BridgeTransport.isValidBluetoothId("a1b2c3d4"))
-        assertTrue(BridgeTransport.isValidBluetoothId("01234567"))
-        assertTrue(BridgeTransport.isValidBluetoothId("ffffffff"))
-        assertFalse(BridgeTransport.isValidBluetoothId("A1B2C3D4"))
-        assertFalse(BridgeTransport.isValidBluetoothId("a1b2c3d"))
-        assertFalse(BridgeTransport.isValidBluetoothId("a1b2c3d45"))
-        assertFalse(BridgeTransport.isValidBluetoothId("a1b2c3dg"))
-        assertFalse(BridgeTransport.isValidBluetoothId(null))
-        assertFalse(BridgeTransport.isValidBluetoothId(""))
+        assertTrue(LinkTransport.isValidBluetoothId("a1b2c3d4"))
+        assertTrue(LinkTransport.isValidBluetoothId("01234567"))
+        assertTrue(LinkTransport.isValidBluetoothId("ffffffff"))
+        assertFalse(LinkTransport.isValidBluetoothId("A1B2C3D4"))
+        assertFalse(LinkTransport.isValidBluetoothId("a1b2c3d"))
+        assertFalse(LinkTransport.isValidBluetoothId("a1b2c3d45"))
+        assertFalse(LinkTransport.isValidBluetoothId("a1b2c3dg"))
+        assertFalse(LinkTransport.isValidBluetoothId(null))
+        assertFalse(LinkTransport.isValidBluetoothId(""))
     }
 
     @Test
     fun bridgeFastLink_chooseDataRoute_allBranches() {
         // LAN control host always routes data over LAN.
         assertEquals(
-            BridgeFastLink.DataRoute.LAN,
-            BridgeFastLink.chooseDataRoute("192.168.1.5", fastLinkEnabled = true, fastLinkSupported = true)
+            FastLink.DataRoute.LAN,
+            FastLink.chooseDataRoute("192.168.1.5", fastLinkEnabled = true, fastLinkSupported = true)
         )
         assertEquals(
-            BridgeFastLink.DataRoute.LAN,
-            BridgeFastLink.chooseDataRoute("192.168.1.5", fastLinkEnabled = false, fastLinkSupported = false)
+            FastLink.DataRoute.LAN,
+            FastLink.chooseDataRoute("192.168.1.5", fastLinkEnabled = false, fastLinkSupported = false)
         )
         // Bluetooth control + enabled + supported -> fast link.
         assertEquals(
-            BridgeFastLink.DataRoute.FAST_LINK,
-            BridgeFastLink.chooseDataRoute(BridgeTransport.BLUETOOTH_HOST, true, true)
+            FastLink.DataRoute.FAST_LINK,
+            FastLink.chooseDataRoute(LinkTransport.BLUETOOTH_HOST, true, true)
         )
         // Disabled or unsupported -> stay on the Bluetooth relay.
         assertEquals(
-            BridgeFastLink.DataRoute.BLUETOOTH,
-            BridgeFastLink.chooseDataRoute(BridgeTransport.BLUETOOTH_HOST, false, true)
+            FastLink.DataRoute.BLUETOOTH,
+            FastLink.chooseDataRoute(LinkTransport.BLUETOOTH_HOST, false, true)
         )
         assertEquals(
-            BridgeFastLink.DataRoute.BLUETOOTH,
-            BridgeFastLink.chooseDataRoute(BridgeTransport.BLUETOOTH_HOST, true, false)
+            FastLink.DataRoute.BLUETOOTH,
+            FastLink.chooseDataRoute(LinkTransport.BLUETOOTH_HOST, true, false)
         )
         // No control host -> Bluetooth fallback.
         assertEquals(
-            BridgeFastLink.DataRoute.BLUETOOTH,
-            BridgeFastLink.chooseDataRoute(null, true, true)
+            FastLink.DataRoute.BLUETOOTH,
+            FastLink.chooseDataRoute(null, true, true)
         )
     }
 
@@ -337,40 +337,40 @@ class BridgeCoreUnitTest {
     fun bridgeFastLink_parseReady_and_stripQuotes() {
         val session = "abc12345-6789"
         val ok = JSONObject("""{"type":"fastlink_ready","session":"$session","ip":"192.168.43.1"}""")
-        assertEquals("192.168.43.1", BridgeFastLink.parseReady(ok, session))
+        assertEquals("192.168.43.1", FastLink.parseReady(ok, session))
 
         // Wrong session -> null
-        assertNull(BridgeFastLink.parseReady(ok, "other-session"))
+        assertNull(FastLink.parseReady(ok, "other-session"))
         // Public IP -> null
         val pub = JSONObject("""{"session":"$session","ip":"8.8.8.8"}""")
-        assertNull(BridgeFastLink.parseReady(pub, session))
+        assertNull(FastLink.parseReady(pub, session))
         // Loopback -> null
         val loop = JSONObject("""{"session":"$session","ip":"127.0.0.1"}""")
-        assertNull(BridgeFastLink.parseReady(loop, session))
+        assertNull(FastLink.parseReady(loop, session))
         // Missing ip -> null
         val missing = JSONObject("""{"session":"$session"}""")
-        assertNull(BridgeFastLink.parseReady(missing, session))
+        assertNull(FastLink.parseReady(missing, session))
 
-        assertEquals("AndroidShare_1234", BridgeFastLink.stripQuotes("\"AndroidShare_1234\""))
-        assertEquals("plain", BridgeFastLink.stripQuotes("plain"))
-        assertNull(BridgeFastLink.stripQuotes(null))
-        assertEquals("\"unclosed", BridgeFastLink.stripQuotes("\"unclosed"))
+        assertEquals("AndroidShare_1234", FastLink.stripQuotes("\"AndroidShare_1234\""))
+        assertEquals("plain", FastLink.stripQuotes("plain"))
+        assertNull(FastLink.stripQuotes(null))
+        assertEquals("\"unclosed", FastLink.stripQuotes("\"unclosed"))
     }
 
     @Test
     fun bridgeFastLink_isInFailureCooldown() {
         val t0 = 1_000_000L
         // Never failed -> not in cooldown
-        assertFalse(BridgeFastLink.isInFailureCooldown(t0, 0L))
+        assertFalse(FastLink.isInFailureCooldown(t0, 0L))
         // Just failed -> in cooldown
-        assertTrue(BridgeFastLink.isInFailureCooldown(t0, t0))
-        assertTrue(BridgeFastLink.isInFailureCooldown(t0 + 30_000, t0))
+        assertTrue(FastLink.isInFailureCooldown(t0, t0))
+        assertTrue(FastLink.isInFailureCooldown(t0 + 30_000, t0))
         // At the boundary -> out of cooldown
-        assertFalse(BridgeFastLink.isInFailureCooldown(t0 + 60_000, t0))
-        assertFalse(BridgeFastLink.isInFailureCooldown(t0 + 120_000, t0))
+        assertFalse(FastLink.isInFailureCooldown(t0 + 60_000, t0))
+        assertFalse(FastLink.isInFailureCooldown(t0 + 120_000, t0))
         // Custom cooldown window
-        assertTrue(BridgeFastLink.isInFailureCooldown(t0 + 5_000, t0, cooldownMs = 10_000))
-        assertFalse(BridgeFastLink.isInFailureCooldown(t0 + 10_000, t0, cooldownMs = 10_000))
+        assertTrue(FastLink.isInFailureCooldown(t0 + 5_000, t0, cooldownMs = 10_000))
+        assertFalse(FastLink.isInFailureCooldown(t0 + 10_000, t0, cooldownMs = 10_000))
     }
 
     @Test
@@ -386,7 +386,7 @@ class BridgeCoreUnitTest {
             "::ffff:127.0.0.1",
             "8.8.8.8",
             "1.1.1.1",
-            BridgeTransport.BLUETOOTH_HOST
+            LinkTransport.BLUETOOTH_HOST
         )
         for (addr in rejected) {
             assertFalse("Expected unusable LAN host: $addr", NetworkSyncClient.isUsableLanHost(addr))
@@ -406,15 +406,15 @@ class BridgeCoreUnitTest {
 
     @Test
     fun notificationModels_validateAndRoundTrip() {
-        val notif = BridgeNotification(
+        val notif = LinkNotification(
             id = "notif_1",
             pkg = "com.example.chat",
             app = "Chat",
             title = "Alex",
             text = "Ping",
-            actions = listOf(BridgeNotificationAction(id = 1, title = "Reply", hasInput = true))
+            actions = listOf(LinkNotificationAction(id = 1, title = "Reply", hasInput = true))
         )
-        val parsed = BridgeNotification.fromJson(JSONObject(notif.toPostJsonString()))
+        val parsed = LinkNotification.fromJson(JSONObject(notif.toPostJsonString()))
         assertNotNull(parsed)
         assertEquals("notif_1", parsed!!.id)
         assertEquals(1, parsed.actions.size)
@@ -616,33 +616,33 @@ class PhaseBFeatureTest {
     private fun json(s: String) = org.json.JSONObject(s)
 
     @Test fun wifiShareValidWpa2() {
-        val r = BridgeWifiShare.WifiShareRequest.fromJson(
+        val r = LinkWifiShare.WifiShareRequest.fromJson(
             json("""{"ssid":"Home","password":"password123","security":"wpa2"}"""))
         assertEquals("Home", r?.ssid); assertEquals("wpa2", r?.security)
     }
     @Test fun wifiShareValidWpa3OpenWep() {
-        assertEquals("wpa3", BridgeWifiShare.WifiShareRequest.fromJson(
+        assertEquals("wpa3", LinkWifiShare.WifiShareRequest.fromJson(
             json("""{"ssid":"A","password":"password123","security":"wpa3"}"""))?.security)
-        assertEquals("open", BridgeWifiShare.WifiShareRequest.fromJson(
+        assertEquals("open", LinkWifiShare.WifiShareRequest.fromJson(
             json("""{"ssid":"A","password":"","security":"open"}"""))?.security)
-        assertEquals("wep", BridgeWifiShare.WifiShareRequest.fromJson(
+        assertEquals("wep", LinkWifiShare.WifiShareRequest.fromJson(
             json("""{"ssid":"A","password":"abc","security":"wep"}"""))?.security)
     }
     @Test fun wifiShareRejectsBad() {
         // 33-byte SSID -> null
-        assertNull(BridgeWifiShare.WifiShareRequest.fromJson(
+        assertNull(LinkWifiShare.WifiShareRequest.fromJson(
             json("""{"ssid":"${"a".repeat(33)}","password":"password123","security":"wpa2"}""")))
         // 7-char wpa2 password -> null
-        assertNull(BridgeWifiShare.WifiShareRequest.fromJson(
+        assertNull(LinkWifiShare.WifiShareRequest.fromJson(
             json("""{"ssid":"A","password":"short12","security":"wpa2"}""")))
         // unknown security -> null
-        assertNull(BridgeWifiShare.WifiShareRequest.fromJson(
+        assertNull(LinkWifiShare.WifiShareRequest.fromJson(
             json("""{"ssid":"A","password":"password123","security":"enterprise"}""")))
     }
     @Test fun apStateMapping() {
-        assertEquals("on", BridgeHotspotShare.apState(13))
-        assertEquals("off", BridgeHotspotShare.apState(11))
-        assertNull(BridgeHotspotShare.apState(0))
-        assertNull(BridgeHotspotShare.apState(10))
+        assertEquals("on", LinkHotspotShare.apState(13))
+        assertEquals("off", LinkHotspotShare.apState(11))
+        assertNull(LinkHotspotShare.apState(0))
+        assertNull(LinkHotspotShare.apState(10))
     }
 }

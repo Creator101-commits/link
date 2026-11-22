@@ -7,8 +7,8 @@ import CryptoKit
 /// Disk+memory cache for remote app icons keyed by package name.
 /// `pkg` is untrusted input: it is NEVER used in a file path — on-disk
 /// filenames are the SHA-256 hex digest of the pkg string.
-public final class BridgeAppIconCache {
-    public static let shared = BridgeAppIconCache()
+public final class LinkAppIconCache {
+    public static let shared = LinkAppIconCache()
 
     private let memoryCache = NSCache<NSString, NSImage>()
     private let directoryURL: URL
@@ -87,7 +87,7 @@ public final class BridgeAppIconCache {
     }
 }
 
-public struct BridgeNotificationAction: Codable, Identifiable {
+public struct LinkNotificationAction: Codable, Identifiable {
     public let id: Int
     public let title: String
     public let hasInput: Bool
@@ -101,7 +101,7 @@ public struct BridgeNotificationAction: Codable, Identifiable {
     }
 }
 
-public struct BridgeMessageItem: Codable, Identifiable {
+public struct LinkMessageItem: Codable, Identifiable {
     public var id: String { "\(timestamp)_\(text.hashValue)" }
     public let text: String
     public let timestamp: Int64
@@ -114,7 +114,7 @@ public struct BridgeMessageItem: Codable, Identifiable {
     }
 }
 
-public struct BridgeNotification: Codable, Identifiable {
+public struct LinkNotification: Codable, Identifiable {
     public let id: String
     public let source: String?       // "android" or "mac"
     public let pkg: String?          // e.g. "com.whatsapp"
@@ -123,9 +123,9 @@ public struct BridgeNotification: Codable, Identifiable {
     public let text: String?         // e.g. "Are we still meeting at 3?"
     public let icon: String?         // Base64 encoded PNG
     public let timestamp: Int64?     // Epoch ms
-    public let actions: [BridgeNotificationAction]?
+    public let actions: [LinkNotificationAction]?
     public let isSilent: Bool?
-    public let messages: [BridgeMessageItem]?
+    public let messages: [LinkMessageItem]?
     public let isNewestFirst: Bool?
 
     public init(
@@ -137,9 +137,9 @@ public struct BridgeNotification: Codable, Identifiable {
         text: String? = nil,
         icon: String? = nil,
         timestamp: Int64? = Int64(Date().timeIntervalSince1970 * 1000),
-        actions: [BridgeNotificationAction]? = nil,
+        actions: [LinkNotificationAction]? = nil,
         isSilent: Bool? = false,
-        messages: [BridgeMessageItem]? = nil,
+        messages: [LinkMessageItem]? = nil,
         isNewestFirst: Bool? = nil
     ) {
         self.id = id
@@ -157,10 +157,10 @@ public struct BridgeNotification: Codable, Identifiable {
     }
 
     public var iconImage: NSImage? {
-        // Android-sourced icons live in BridgeAppIconCache keyed by pkg;
+        // Android-sourced icons live in LinkAppIconCache keyed by pkg;
         // fall back to the inline base64 (mac-source notifications).
         if let pkg = pkg, !pkg.isEmpty,
-           let cached = BridgeAppIconCache.shared.image(pkg: pkg) {
+           let cached = LinkAppIconCache.shared.image(pkg: pkg) {
             return cached
         }
         guard let base64 = icon,

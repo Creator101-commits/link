@@ -2,11 +2,11 @@ import Foundation
 import AppKit
 import UserNotifications
 
-public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
+public class LinkNotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
 
-    public static let shared = BridgeNotificationManager()
+    public static let shared = LinkNotificationManager()
 
-    @Published public var activeNotifications: [BridgeNotification] = []
+    @Published public var activeNotifications: [LinkNotification] = []
     @Published public var replyDrafts: [String: String] = [:]
     @Published public var isSystemNotificationAllowed: Bool = true
 
@@ -120,7 +120,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             "notifMasterEnabled": isMasterNotificationsEnabled,
             "androidNotifEnabled": isMirroringEnabled,
             "macNotifEnabled": isMacAlertsForwardingEnabled,
-            "autoAcceptFiles": BridgeFileTransferManager.shared.autoAcceptIncomingFiles,
+            "autoAcceptFiles": LinkFileTransferManager.shared.autoAcceptIncomingFiles,
             "skipSilentNotifications": isSkipSilentEnabled,
             "appRules": appRules,
             "updatedAt": settingsUpdatedAt
@@ -135,7 +135,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
     public func broadcastSettingsSync() {
         if let str = buildSettingsSyncJson() {
             sendPayload?(str)
-            NSLog("[BridgeNotif] Broadcasted settings_sync: master=\(isMasterNotificationsEnabled), android=\(isMirroringEnabled), mac=\(isMacAlertsForwardingEnabled)")
+            NSLog("[LinkNotif] Broadcasted settings_sync: master=\(isMasterNotificationsEnabled), android=\(isMirroringEnabled), mac=\(isMacAlertsForwardingEnabled)")
         }
     }
 
@@ -213,13 +213,13 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
                 // filtered notification still caches the phone app's icon.
                 if let pkg = json["pkg"] as? String,
                    let icon = json["icon"] as? String {
-                    BridgeAppIconCache.shared.store(pkg: pkg, base64: icon)
+                    LinkAppIconCache.shared.store(pkg: pkg, base64: icon)
                 }
                 guard self.isEffectiveAndroidReceiveEnabled else {
-                    NSLog("[BridgeNotif] Ignoring incoming phone notification (Android notifications disabled)")
+                    NSLog("[LinkNotif] Ignoring incoming phone notification (Android notifications disabled)")
                     return
                 }
-                if let notif = try? JSONDecoder().decode(BridgeNotification.self, from: data) {
+                if let notif = try? JSONDecoder().decode(LinkNotification.self, from: data) {
                     self.processIncomingNotification(notif)
                 }
 
@@ -271,12 +271,12 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             appRules = rules
         }
         if let autoAccept = json["autoAcceptFiles"] as? Bool {
-            BridgeFileTransferManager.shared.isApplyingRemoteSettings = true
-            BridgeFileTransferManager.shared.autoAcceptIncomingFiles = autoAccept
-            BridgeFileTransferManager.shared.isApplyingRemoteSettings = false
+            LinkFileTransferManager.shared.isApplyingRemoteSettings = true
+            LinkFileTransferManager.shared.autoAcceptIncomingFiles = autoAccept
+            LinkFileTransferManager.shared.isApplyingRemoteSettings = false
         }
         isApplyingRemoteSettings = false
-        NSLog("[BridgeNotif] Applied remote settings_sync: master=\(isMasterNotificationsEnabled), android=\(isMirroringEnabled), mac=\(isMacAlertsForwardingEnabled), autoAcceptFiles=\(BridgeFileTransferManager.shared.autoAcceptIncomingFiles)")
+        NSLog("[LinkNotif] Applied remote settings_sync: master=\(isMasterNotificationsEnabled), android=\(isMirroringEnabled), mac=\(isMacAlertsForwardingEnabled), autoAcceptFiles=\(LinkFileTransferManager.shared.autoAcceptIncomingFiles)")
     }
 
     private func normalizeNotifId(_ raw: String) -> String {
@@ -300,21 +300,21 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         return norm
     }
 
-    private func processIncomingNotification(_ rawNotif: BridgeNotification) {
+    private func processIncomingNotification(_ rawNotif: LinkNotification) {
         guard isEffectiveAndroidReceiveEnabled else { return }
         let normalizedId = normalizeNotifId(rawNotif.id)
         guard !normalizedId.isEmpty && normalizedId.count <= 256 else { return }
 
         let safeIcon = (rawNotif.icon?.count ?? 0) <= 524_288 ? rawNotif.icon : nil
         let safeActions = rawNotif.actions.map { Array($0.prefix(5)) }
-        let notif = BridgeNotification(
+        let notif = LinkNotification(
             id: normalizedId,
             source: rawNotif.source ?? "android",
             pkg: rawNotif.pkg.map { String($0.prefix(128)) },
             app: rawNotif.app.map { String($0.prefix(128)) },
             title: rawNotif.title.map { String($0.prefix(256)) },
             text: rawNotif.text.map { String($0.prefix(4000)) },
-            // Android icons resolve via BridgeAppIconCache by pkg; keeping the
+            // Android icons resolve via LinkAppIconCache by pkg; keeping the
             // base64 out of the stored model saves memory on every render.
             icon: (rawNotif.source ?? "android") == "android" ? nil : safeIcon,
             timestamp: rawNotif.timestamp,
@@ -324,7 +324,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             isNewestFirst: rawNotif.isNewestFirst
         )
 
-        var previousNotif: BridgeNotification? = nil
+        var previousNotif: LinkNotification? = nil
 
         // Only treat as duplicate if ID is identical, or if app, title, AND text match within 2.5s
         if let existingIdx = activeNotifications.firstIndex(where: {
@@ -368,8 +368,8 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
     }
 
     public static func formatBannerContent(
-        for notif: BridgeNotification,
-        previousNotif: BridgeNotification? = nil
+        for notif: LinkNotification,
+        previousNotif: LinkNotification? = nil
     ) -> (subtitle: String, body: String) {
         let baseTitle = notif.title ?? ""
 
@@ -429,7 +429,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         return (subtitle, String(joined.prefix(2000)))
     }
 
-    private func deliverNativeBanner(_ notif: BridgeNotification, previousNotif: BridgeNotification? = nil) {
+    private func deliverNativeBanner(_ notif: LinkNotification, previousNotif: LinkNotification? = nil) {
         pendingBannerWorkItems[notif.id]?.cancel()
         pendingBannerWorkItems.removeValue(forKey: notif.id)
 
@@ -461,10 +461,10 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         content.userInfo = ["notif_id": notif.id]
 
         // Show the phone app's own icon as a notification attachment
-        // thumbnail (the banner's leading icon stays Bridge's — replacing it
+        // thumbnail (the banner's leading icon stays Link's — replacing it
         // needs a restricted entitlement we don't have).
         if let pkg = notif.pkg, !pkg.isEmpty,
-           let iconURL = BridgeAppIconCache.shared.attachmentURL(pkg: pkg) {
+           let iconURL = LinkAppIconCache.shared.attachmentURL(pkg: pkg) {
             do {
                 content.attachments = [try UNNotificationAttachment(
                     identifier: "appicon", url: iconURL, options: nil
@@ -532,9 +532,9 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
                     let postRequest: () -> Void = {
                         center.add(request) { error in
                             if let error = error {
-                                NSLog("[BridgeNotif] Failed to post banner: \(error.localizedDescription)")
+                                NSLog("[LinkNotif] Failed to post banner: \(error.localizedDescription)")
                             } else {
-                                NSLog("[BridgeNotif] Successfully posted banner for '\(notif.id)' [\(notif.app ?? "")]")
+                                NSLog("[LinkNotif] Successfully posted banner for '\(notif.id)' [\(notif.app ?? "")]")
                             }
                         }
                     }
@@ -617,14 +617,14 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             .map { $0.id }
 
         for staleId in staleIds {
-            NSLog("[BridgeNotif] Reconciling & removing cleared phone notification: '\(staleId)'")
+            NSLog("[LinkNotif] Reconciling & removing cleared phone notification: '\(staleId)'")
             removeNotification(id: staleId)
         }
     }
 
     public func removeNotification(id: String) {
         let cleanId = normalizeNotifId(id)
-        NSLog("[BridgeNotif] Removing notification: '\(cleanId)'. Active before: \(activeNotifications.count)")
+        NSLog("[LinkNotif] Removing notification: '\(cleanId)'. Active before: \(activeNotifications.count)")
         let matchingIds = activeNotifications
             .filter { $0.id == id || normalizeNotifId($0.id) == cleanId }
             .map { $0.id }
@@ -638,7 +638,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             replyDrafts.removeValue(forKey: key)
             replyErrors.removeValue(forKey: key)
         }
-        NSLog("[BridgeNotif] Active after: \(activeNotifications.count)")
+        NSLog("[LinkNotif] Active after: \(activeNotifications.count)")
 
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: allIdsToClean)
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: allIdsToClean)
@@ -663,7 +663,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             sendPayload(str)
             replyErrors.removeValue(forKey: id)
             replyErrors.removeValue(forKey: baseId)
-            NSLog("[BridgeNotif] Sent reply for \(baseId) (action \(actionId)): \(replyText)")
+            NSLog("[LinkNotif] Sent reply for \(baseId) (action \(actionId)): \(replyText)")
         } else {
             replyErrors[id] = "Could not encode reply."
         }
@@ -675,7 +675,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         if let data = try? JSONEncoder().encode(req),
            let str = String(data: data, encoding: .utf8) {
             sendPayload?(str)
-            NSLog("[BridgeNotif] Sent action click for \(baseId) (action \(actionId))")
+            NSLog("[LinkNotif] Sent action click for \(baseId) (action \(actionId))")
         }
     }
 
@@ -694,7 +694,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             if let data = try? JSONEncoder().encode(req),
                let str = String(data: data, encoding: .utf8) {
                 sendPayload?(str)
-                NSLog("[BridgeNotif] Sent dismissal for base notification \(baseId)")
+                NSLog("[LinkNotif] Sent dismissal for base notification \(baseId)")
             }
         }
     }
@@ -733,7 +733,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         clearLocalNotificationsOnly()
     }
 
-    public func sendNotificationToPhone(_ notif: BridgeNotification) {
+    public func sendNotificationToPhone(_ notif: LinkNotification) {
         guard isEffectiveMacForwardEnabled else { return }
         guard let data = try? JSONEncoder().encode(notif),
               var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -743,7 +743,7 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         if let outData = try? JSONSerialization.data(withJSONObject: json),
            let str = String(data: outData, encoding: .utf8) {
             sendPayload?(str)
-            NSLog("[BridgeNotif] Dispatched Mac alert to phone: [\(notif.app ?? "Mac")] \(notif.title ?? "")")
+            NSLog("[LinkNotif] Dispatched Mac alert to phone: [\(notif.app ?? "Mac")] \(notif.title ?? "")")
         }
     }
 
@@ -759,11 +759,11 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             let transferId = (response.notification.request.content.userInfo["transfer_id"] as? String)
                 ?? reqId.replacingOccurrences(of: "bridge.transfer.", with: "")
             if response.actionIdentifier.starts(with: "file_accept_") {
-                if let item = BridgeFileTransferManager.shared.transfers.first(where: { $0.id == transferId }) {
-                    BridgeFileTransferManager.shared.acceptIncomingTransfer(item)
+                if let item = LinkFileTransferManager.shared.transfers.first(where: { $0.id == transferId }) {
+                    LinkFileTransferManager.shared.acceptIncomingTransfer(item)
                 }
             } else if response.actionIdentifier.starts(with: "file_decline_") || response.actionIdentifier == UNNotificationDismissActionIdentifier {
-                BridgeFileTransferManager.shared.cancelTransfer(id: transferId, notifyPeer: true)
+                LinkFileTransferManager.shared.cancelTransfer(id: transferId, notifyPeer: true)
             } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
                 DispatchQueue.main.async {
                     NSApp.activate(ignoringOtherApps: true)
@@ -775,9 +775,9 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
 
         if reqId == "incoming-call" {
             if response.actionIdentifier == "call_answer" {
-                Task { @MainActor in BridgeCallManager.shared.answerCall() }
+                Task { @MainActor in LinkCallManager.shared.answerCall() }
             } else if response.actionIdentifier == "call_decline" {
-                Task { @MainActor in BridgeCallManager.shared.declineCall() }
+                Task { @MainActor in LinkCallManager.shared.declineCall() }
             }
             completionHandler()
             return

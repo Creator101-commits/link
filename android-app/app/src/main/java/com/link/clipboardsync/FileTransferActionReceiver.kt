@@ -18,15 +18,15 @@ class FileTransferActionReceiver : BroadcastReceiver() {
         val transferId = intent.getStringExtra(EXTRA_TRANSFER_ID) ?: return
         Log.d(TAG, "Received transfer action: ${intent.action} for id: $transferId")
 
-        BridgeFileTransferManager.dismissPromptNotification(context, transferId)
-        BridgeFileTransferManager.dismissProgressNotification(context, transferId)
+        LinkFileTransferManager.dismissPromptNotification(context, transferId)
+        LinkFileTransferManager.dismissProgressNotification(context, transferId)
 
         when (intent.action) {
             ACTION_ACCEPT_TRANSFER -> {
-                BridgeFileTransferManager.acceptIncomingFile(context, transferId)
+                LinkFileTransferManager.acceptIncomingFile(context, transferId)
             }
             ACTION_DECLINE_TRANSFER, ACTION_CANCEL_TRANSFER -> {
-                BridgeFileTransferManager.cancelTransfer(transferId, notifyPeer = true)
+                LinkFileTransferManager.cancelTransfer(transferId, notifyPeer = true)
             }
         }
     }

@@ -21,13 +21,13 @@ import androidx.core.app.NotificationCompat
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 
-class BridgeNotificationListenerService : NotificationListenerService() {
+class LinkNotificationListenerService : NotificationListenerService() {
 
     companion object {
-        private const val TAG = "BridgeNotifListener"
+        private const val TAG = "LinkNotifListener"
 
         @Volatile
-        var instance: BridgeNotificationListenerService? = null
+        var instance: LinkNotificationListenerService? = null
             private set
 
         fun isListening(): Boolean = instance != null
@@ -42,7 +42,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         // Cache recent posted notifications to prevent rapid-fire duplicate events
         private val recentPosted = ConcurrentHashMap<String, Long>()
         private val lastSeenTextByNormKey = ConcurrentHashMap<String, String>()
-        private val messageHistoryByNormKey = ConcurrentHashMap<String, MutableList<BridgeMessageItem>>()
+        private val messageHistoryByNormKey = ConcurrentHashMap<String, MutableList<LinkMessageItem>>()
         private val lastInboxLinesByNormKey = ConcurrentHashMap<String, List<String>>()
 
         fun normalizeKey(raw: String): String =
@@ -66,7 +66,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
-        Log.i(TAG, "Bridge Notification Listener connected.")
+        Log.i(TAG, "Link Notification Listener connected.")
         syncActiveNotifications()
     }
 
@@ -78,7 +78,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         lastSeenTextByNormKey.clear()
         messageHistoryByNormKey.clear()
         lastInboxLinesByNormKey.clear()
-        Log.i(TAG, "Bridge Notification Listener disconnected.")
+        Log.i(TAG, "Link Notification Listener disconnected.")
     }
 
     private fun shouldDeduplicatePost(dedupeKey: String): Boolean {
@@ -104,12 +104,12 @@ class BridgeNotificationListenerService : NotificationListenerService() {
 
     private fun processNotificationPosted(sbn: StatusBarNotification?, isFullSync: Boolean) {
         if (sbn == null) return
-        if (!BridgePrefs.isNotificationSyncEnabled(this)) return
+        if (!LinkPrefs.isNotificationSyncEnabled(this)) return
 
         val pkg = sbn.packageName ?: return
-        if (pkg == packageName) return // Don't mirror Bridge's own notifications
+        if (pkg == packageName) return // Don't mirror Link's own notifications
 
-        if (BridgePrefs.isAppBlacklisted(this, pkg)) {
+        if (LinkPrefs.isAppBlacklisted(this, pkg)) {
             Log.d(TAG, "Skipping notification from blacklisted app: $pkg")
             return
         }
@@ -140,9 +140,9 @@ class BridgeNotificationListenerService : NotificationListenerService() {
             return
         }
 
-        // Calls are mirrored by BridgeCallMonitor; don't duplicate the dialer's notification.
+        // Calls are mirrored by LinkCallMonitor; don't duplicate the dialer's notification.
         if (category == Notification.CATEGORY_CALL &&
-            (BridgeCallMonitor.isCallInProgress || BridgeCallMonitor.hasPermissions(this))
+            (LinkCallMonitor.isCallInProgress || LinkCallMonitor.hasPermissions(this))
         ) {
             return
         }
@@ -158,10 +158,10 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         }
         val ambient = hasRanking && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ranking.isAmbient
         if (!NotificationForwardPolicy.shouldForward(
-                level = BridgePrefs.appNotificationRule(this, pkg),
+                level = LinkPrefs.appNotificationRule(this, pkg),
                 importance = importance,
                 ambient = ambient,
-                skipSilent = BridgePrefs.isSkipSilentNotificationsEnabled(this),
+                skipSilent = LinkPrefs.isSkipSilentNotificationsEnabled(this),
                 isCallOrMessage = category == Notification.CATEGORY_CALL || category == Notification.CATEGORY_MESSAGE
             )
         ) {
@@ -188,11 +188,11 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         }
 
         // Icon is cached per package; per-connection de-dup happens in
-        // BridgeNotificationManager.postToMac right before sending.
+        // LinkNotificationManager.postToMac right before sending.
         val iconBase64 = getOrEncodeAppIcon(pkg)
 
         // Parse notification actions
-        val actionsList = ArrayList<BridgeNotificationAction>()
+        val actionsList = ArrayList<LinkNotificationAction>()
         val actionsMap = ConcurrentHashMap<Int, ActionHolder>()
 
         val notifActions = notif.actions
@@ -207,7 +207,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
                 val placeholder = if (hasInput) remoteInputs?.firstOrNull()?.label?.toString() else null
 
                 actionsList.add(
-                    BridgeNotificationAction(
+                    LinkNotificationAction(
                         id = i,
                         title = actionTitle,
                         hasInput = hasInput,
@@ -231,7 +231,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
             val conversationTitle = messagingStyle.conversationTitle?.toString()
             val isGroup = messagingStyle.isGroupConversation || !conversationTitle.isNullOrBlank()
             val messages = messagingStyle.messages
-            val messageItems = ArrayList<BridgeMessageItem>()
+            val messageItems = ArrayList<LinkMessageItem>()
 
             for (msg in messages) {
                 var msgText = msg.text?.toString() ?: ""
@@ -246,7 +246,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
                 val senderPerson = msg.person
                 val senderName = senderPerson?.name?.toString() ?: msg.sender?.toString()
                 val msgTime = if (msg.timestamp > 0) msg.timestamp else sbn.postTime
-                messageItems.add(BridgeMessageItem(text = msgText, timestamp = msgTime, sender = senderName))
+                messageItems.add(LinkMessageItem(text = msgText, timestamp = msgTime, sender = senderName))
             }
 
             if (messageItems.isNotEmpty()) {
@@ -270,7 +270,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
                 }
 
                 val lastMsgTime = messageItems.last().timestamp
-                val bridgeNotif = BridgeNotification(
+                val bridgeNotif = LinkNotification(
                     id = normKey,
                     source = "android",
                     pkg = pkg,
@@ -284,7 +284,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
                     messages = messageItems,
                     isNewestFirst = false
                 )
-                BridgeNotificationManager.postToMac(bridgeNotif)
+                LinkNotificationManager.postToMac(bridgeNotif)
                 return
             }
         }
@@ -292,13 +292,13 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         // 2. Check for InboxStyle (Gmail, Samsung Email, etc. with multiple text lines)
         val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
         if (textLines != null && textLines.isNotEmpty()) {
-            val messageItems = ArrayList<BridgeMessageItem>()
+            val messageItems = ArrayList<LinkMessageItem>()
             val rawLines = ArrayList<String>()
             for (line in textLines) {
                 val lineStr = line?.toString() ?: continue
                 if (lineStr.isBlank()) continue
                 rawLines.add(lineStr)
-                messageItems.add(BridgeMessageItem(text = lineStr, timestamp = sbn.postTime))
+                messageItems.add(LinkMessageItem(text = lineStr, timestamp = sbn.postTime))
             }
 
             if (messageItems.isNotEmpty()) {
@@ -322,7 +322,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
                     return
                 }
 
-                val bridgeNotif = BridgeNotification(
+                val bridgeNotif = LinkNotification(
                     id = normKey,
                     source = "android",
                     pkg = pkg,
@@ -336,7 +336,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
                     messages = messageItems,
                     isNewestFirst = inboxNewestFirst
                 )
-                BridgeNotificationManager.postToMac(bridgeNotif)
+                LinkNotificationManager.postToMac(bridgeNotif)
                 return
             }
         }
@@ -349,13 +349,13 @@ class BridgeNotificationListenerService : NotificationListenerService() {
                 category == Notification.CATEGORY_PROGRESS
 
         val history = messageHistoryByNormKey.computeIfAbsent(normKey) { ArrayList() }
-        var messagesToSend: List<BridgeMessageItem>? = null
+        var messagesToSend: List<LinkMessageItem>? = null
         var textToSend = defaultText
 
         if (!isProgress && defaultText.isNotBlank()) {
             synchronized(history) {
                 if (history.isEmpty() || history.last().text != defaultText) {
-                    history.add(BridgeMessageItem(text = defaultText, timestamp = sbn.postTime))
+                    history.add(LinkMessageItem(text = defaultText, timestamp = sbn.postTime))
                     if (history.size > 20) {
                         history.removeAt(0)
                     }
@@ -373,7 +373,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
             return
         }
 
-        val bridgeNotif = BridgeNotification(
+        val bridgeNotif = LinkNotification(
             id = normKey,
             source = "android",
             pkg = pkg,
@@ -388,7 +388,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
             isNewestFirst = if (messagesToSend != null) false else null
         )
 
-        BridgeNotificationManager.postToMac(bridgeNotif)
+        LinkNotificationManager.postToMac(bridgeNotif)
     }
 
     private fun isReverseChronologicalInbox(pkg: String, category: String?): Boolean {
@@ -406,13 +406,13 @@ class BridgeNotificationListenerService : NotificationListenerService() {
     private val recentRemovals = ConcurrentHashMap<String, Long>()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val reconcileRunnable = Runnable {
-        BridgeNotificationManager.syncActiveIdsToMac(getActiveNormalizedKeys())
+        LinkNotificationManager.syncActiveIdsToMac(getActiveNormalizedKeys())
     }
 
     private fun isMirrorableNotification(sbn: StatusBarNotification): Boolean {
         val pkg = sbn.packageName ?: return false
         if (pkg == packageName) return false
-        if (BridgePrefs.isAppBlacklisted(this, pkg)) return false
+        if (LinkPrefs.isAppBlacklisted(this, pkg)) return false
         val notif = sbn.notification ?: return false
         if ((notif.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return false
         val isOngoing = (notif.flags and Notification.FLAG_ONGOING_EVENT) != 0 ||
@@ -472,7 +472,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         Log.d(TAG, "Notification removed on device: $normKey ($pkg)")
         clearStateForKey(normKey)
         val remainingActive = getActiveNormalizedKeys(excludingKey = normKey)
-        BridgeNotificationManager.removeFromMac(
+        LinkNotificationManager.removeFromMac(
             key = normKey,
             pkg = pkg,
             title = title,
@@ -498,21 +498,21 @@ class BridgeNotificationListenerService : NotificationListenerService() {
     }
 
     fun syncActiveIdsOnly() {
-        if (!BridgePrefs.isNotificationSyncEnabled(this)) return
+        if (!LinkPrefs.isNotificationSyncEnabled(this)) return
         try {
             val activeKeys = getActiveNormalizedKeys()
-            BridgeNotificationManager.syncActiveIdsToMac(activeKeys)
+            LinkNotificationManager.syncActiveIdsToMac(activeKeys)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync active notification IDs: ${e.message}")
         }
     }
 
     fun syncActiveNotifications() {
-        if (!BridgePrefs.isNotificationSyncEnabled(this)) return
+        if (!LinkPrefs.isNotificationSyncEnabled(this)) return
         try {
             val activeSBNS = activeNotifications ?: return
             val activeKeys = getActiveNormalizedKeys()
-            BridgeNotificationManager.syncActiveIdsToMac(activeKeys)
+            LinkNotificationManager.syncActiveIdsToMac(activeKeys)
             Log.d(TAG, "Syncing active notifications: count=${activeSBNS.size}")
             for (sbn in activeSBNS) {
                 processNotificationPosted(sbn, isFullSync = true)

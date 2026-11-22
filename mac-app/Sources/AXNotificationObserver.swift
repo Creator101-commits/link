@@ -12,7 +12,7 @@ public class AXNotificationObserver: ObservableObject {
 
     @Published public var isAccessibilityTrusted: Bool = AXIsProcessTrusted()
 
-    public var onNotificationCaptured: ((BridgeNotification) -> Void)?
+    public var onNotificationCaptured: ((LinkNotification) -> Void)?
 
     private var observer: AXObserver?
     private var observerSource: CFRunLoopSource?
@@ -298,7 +298,7 @@ public class AXNotificationObserver: ObservableObject {
         }
 
         // 2. Filter out phone-app echoes and notifications already mirrored from Android
-        let isMirroredFromPhone = BridgeNotificationManager.shared.activeNotifications.contains { phoneNotif in
+        let isMirroredFromPhone = LinkNotificationManager.shared.activeNotifications.contains { phoneNotif in
             let pApp = phoneNotif.app?.lowercased() ?? ""
             let pTitle = phoneNotif.title?.lowercased() ?? ""
             let pText = phoneNotif.text?.lowercased() ?? ""
@@ -328,7 +328,7 @@ public class AXNotificationObserver: ObservableObject {
         // Retrieve scaled 96x96 PNG base64 icon
         let iconBase64 = getAppIconBase64(appName: appName)
 
-        let notif = BridgeNotification(
+        let notif = LinkNotification(
             id: notifId,
             source: "mac",
             pkg: "com.apple",

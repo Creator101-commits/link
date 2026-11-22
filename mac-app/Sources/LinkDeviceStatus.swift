@@ -5,8 +5,8 @@ import UserNotifications
 /// Cleared on disconnect. Drives the Devices-tab Phone card, the header
 /// battery pill, and the low-battery alert.
 @MainActor
-final class BridgeDeviceStatus: ObservableObject {
-    static let shared = BridgeDeviceStatus()
+final class LinkDeviceStatus: ObservableObject {
+    static let shared = LinkDeviceStatus()
 
     struct Status: Equatable {
         var battery: Int?
@@ -77,7 +77,7 @@ final class BridgeDeviceStatus: ObservableObject {
     private func evaluateLowBattery(_ s: Status) {
         let threshold = UserDefaults.standard.integer(forKey: "lowBatteryThreshold")
         guard threshold > 0, let level = s.battery, let charging = s.charging else { return }
-        let (alertLevel, newState) = BridgeDeviceStatus.lowBatteryDecision(
+        let (alertLevel, newState) = LinkDeviceStatus.lowBatteryDecision(
             level: level, charging: charging, threshold: threshold, state: alertedThisDischarge ? 1 : 0
         )
         alertedThisDischarge = (newState == 1)

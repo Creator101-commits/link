@@ -355,7 +355,7 @@ struct BigUInt2048: Equatable {
     }
 }
 
-enum BridgeSpeke {
+enum LinkSpeke {
     // RFC 3526 Group 14 (2048-bit MODP Safe Prime p = 2q + 1)
     static let pHex =
         "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
@@ -469,7 +469,7 @@ enum BridgeSpeke {
     }
 }
 
-final class BridgeSessionCipher {
+final class LinkSessionCipher {
     private let sendKey: SymmetricKey
     private let receiveKey: SymmetricKey
     private let sendDirection: String
@@ -570,7 +570,7 @@ final class BridgeSessionCipher {
 
 // MARK: - Pairing Security Gate
 
-final class BridgeHandshakeGate {
+final class LinkHandshakeGate {
     enum FailureReason: Equatable {
         case rateLimited
         case invalidPayload
@@ -584,7 +584,7 @@ final class BridgeHandshakeGate {
         let clientNonce: String?
         let serverNonce: String?
         let serverPublicHex: String?
-        let sessionMaterial: BridgeSpeke.SessionMaterial?
+        let sessionMaterial: LinkSpeke.SessionMaterial?
         let failureReason: FailureReason?
     }
 
@@ -639,7 +639,7 @@ final class BridgeHandshakeGate {
 
         guard clientNonce.count >= 16,
               clientNonce.count <= 128,
-              BridgeSpeke.isValidPublicElement(rawClientPublicHex),
+              LinkSpeke.isValidPublicElement(rawClientPublicHex),
               let clientPub = BigUInt2048(hex: rawClientPublicHex) else {
             recordFailedAttempt(for: remoteIp, now: now)
             return EvaluationResult(
@@ -667,12 +667,12 @@ final class BridgeHandshakeGate {
         }
 
         let clientPublicHex = clientPub.toHex(minByteLength: 256)
-        let serverNonce = serverNonceOverride ?? BridgeSpeke.generateNonce()
-        let serverScalar = serverScalarOverride ?? BridgeSpeke.generatePrivateScalar()
-        let generator = BridgeSpeke.deriveGenerator(pairingCode: targetCode, clientNonce: clientNonce)
-        let serverPublicHex = BridgeSpeke.computePublicElement(generator: generator, privateScalar: serverScalar)
+        let serverNonce = serverNonceOverride ?? LinkSpeke.generateNonce()
+        let serverScalar = serverScalarOverride ?? LinkSpeke.generatePrivateScalar()
+        let generator = LinkSpeke.deriveGenerator(pairingCode: targetCode, clientNonce: clientNonce)
+        let serverPublicHex = LinkSpeke.computePublicElement(generator: generator, privateScalar: serverScalar)
 
-        guard let sharedSecretHex = BridgeSpeke.computeSharedSecret(
+        guard let sharedSecretHex = LinkSpeke.computeSharedSecret(
             peerPublicHex: clientPublicHex,
             privateScalar: serverScalar
         ) else {
@@ -695,7 +695,7 @@ final class BridgeHandshakeGate {
             usedHelloNonces.remove(oldest)
         }
 
-        let material = BridgeSpeke.deriveSessionMaterial(
+        let material = LinkSpeke.deriveSessionMaterial(
             sharedSecretHex: sharedSecretHex,
             pairingCode: targetCode,
             clientNonce: clientNonce,
@@ -717,7 +717,7 @@ final class BridgeHandshakeGate {
 
     func evaluateAuth(
         jsonObject: [String: Any],
-        sessionMaterial: BridgeSpeke.SessionMaterial,
+        sessionMaterial: LinkSpeke.SessionMaterial,
         clientNonce: String,
         remoteIp: String,
         now: TimeInterval = Date().timeIntervalSince1970
@@ -786,7 +786,7 @@ final class BridgeHandshakeGate {
             let lockoutDuration = Self.baseLockoutSeconds * multiplier
             ipLockoutUntil[ip] = now + lockoutDuration
             failedHelloTimestampsByIp.removeValue(forKey: ip)
-            NSLog("[BridgeSecurity] Locked out IP %@ for %.0fs after %d failed pairing attempts", ip, lockoutDuration, attempts.count)
+            NSLog("[LinkSecurity] Locked out IP %@ for %.0fs after %d failed pairing attempts", ip, lockoutDuration, attempts.count)
         }
 
         globalFailedHelloTimestamps = globalFailedHelloTimestamps.filter { $0 >= cutoff }
@@ -794,7 +794,7 @@ final class BridgeHandshakeGate {
         if globalFailedHelloTimestamps.count >= Self.maxGlobalFailedAttempts {
             globalLockoutUntil = now + Self.globalLockoutSeconds
             globalFailedHelloTimestamps.removeAll()
-            NSLog("[BridgeSecurity] Global handshake rate-limit triggered for %.0fs", Self.globalLockoutSeconds)
+            NSLog("[LinkSecurity] Global handshake rate-limit triggered for %.0fs", Self.globalLockoutSeconds)
         }
     }
 
@@ -815,14 +815,14 @@ final class BridgeHandshakeGate {
     }
 }
 
-// MARK: - Bridge Server Engine
+// MARK: - Link Server Engine
 
-class BridgeServer {
+class LinkServer {
     private struct PendingHandshake {
         let clientNonce: String
         let deviceName: String
         let remoteIp: String
-        let material: BridgeSpeke.SessionMaterial
+        let material: LinkSpeke.SessionMaterial
     }
 
     let port: NWEndpoint.Port = 8765
@@ -830,7 +830,7 @@ class BridgeServer {
     private var connections = [UUID: NWConnection]()
     private var authenticatedConnections = Set<UUID>()
     private var pendingHandshakes = [UUID: PendingHandshake]()
-    private var sessionCiphers = [UUID: BridgeSessionCipher]()
+    private var sessionCiphers = [UUID: LinkSessionCipher]()
     private var clientDeviceNames = [UUID: String]()
     private var connectionLastSeen = [UUID: TimeInterval]()
     private var connectionCreatedAt = [UUID: TimeInterval]()
@@ -867,7 +867,7 @@ class BridgeServer {
     ]
 
     // Brute-force & replay protection state (accessed on networkQueue)
-    private let handshakeGate = BridgeHandshakeGate()
+    private let handshakeGate = LinkHandshakeGate()
     
     // Pairing state
     private(set) var pairingCode: String = ""
@@ -891,10 +891,10 @@ class BridgeServer {
     
     init() {
         loadOrGeneratePairingCode()
-        BridgeNotificationManager.shared.sendPayload = { [weak self] jsonString in
+        LinkNotificationManager.shared.sendPayload = { [weak self] jsonString in
             self?.broadcastRawJson(jsonString)
         }
-        BridgeFileTransferManager.shared.sendControlMessage = { [weak self] jsonString, targetDeviceId in
+        LinkFileTransferManager.shared.sendControlMessage = { [weak self] jsonString, targetDeviceId in
             self?.sendRawJson(jsonString, toDeviceId: targetDeviceId)
         }
     }
@@ -1031,12 +1031,12 @@ class BridgeServer {
             listener = try NWListener(using: parameters, on: port)
             
             let hostName = Host.current().localizedName ?? "Mac"
-            listener?.service = NWListener.Service(name: "Bridge (\(hostName))", type: "_clipboardsync._tcp")
+            listener?.service = NWListener.Service(name: "Link (\(hostName))", type: "_clipboardsync._tcp")
             
             listener?.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
-                    print("[Bridge] TCP & Bonjour advertisement ready on port \(self?.port.rawValue ?? 8765)")
+                    print("[Link] TCP & Bonjour advertisement ready on port \(self?.port.rawValue ?? 8765)")
                 case .failed(_):
                     self?.restartServer()
                 default:
@@ -1050,7 +1050,7 @@ class BridgeServer {
             
             listener?.start(queue: networkQueue)
         } catch {
-            print("[Bridge] Listener error: \(error)")
+            print("[Link] Listener error: \(error)")
         }
     }
     
@@ -1083,7 +1083,7 @@ class BridgeServer {
 
             // 1. Reject non-private / non-local network connections
             if remoteIp != "local" && !isLocalOrPrivateIp(remoteIp) {
-                NSLog("[BridgeSecurity] Rejected connection from non-private IP: %@", remoteIp)
+                NSLog("[LinkSecurity] Rejected connection from non-private IP: %@", remoteIp)
                 conn.cancel()
                 return
             }
@@ -1091,7 +1091,7 @@ class BridgeServer {
             // 2. Enforce connection limits to prevent socket exhaustion DoS
             let unauthCount = self.connections.count - self.authenticatedConnections.count
             if self.connections.count >= Self.maxConcurrentConnections || unauthCount >= Self.maxUnauthConnections {
-                NSLog("[BridgeSecurity] Rejected connection from %@ (concurrent limit reached)", remoteIp)
+                NSLog("[LinkSecurity] Rejected connection from %@ (concurrent limit reached)", remoteIp)
                 conn.cancel()
                 return
             }
@@ -1130,7 +1130,7 @@ class BridgeServer {
         connectionCreatedAt.removeValue(forKey: id)
         connectionRemoteIp.removeValue(forKey: id)
         if wasAuthenticated {
-            BridgeFastLinkManager.shared.controlConnectionClosed(deviceId: id)
+            FastLinkManager.shared.controlConnectionClosed(deviceId: id)
             notifyUiStatus()
         }
     }
@@ -1144,7 +1144,7 @@ class BridgeServer {
                 currentBuffer.append(data)
                 let maxAllowed = self.authenticatedConnections.contains(id) ? Self.maxAuthBufferBytes : Self.maxUnauthBufferBytes
                 if currentBuffer.count > maxAllowed {
-                    NSLog("[BridgeSecurity] Disconnecting client Exceeded max buffer (%d bytes)", currentBuffer.count)
+                    NSLog("[LinkSecurity] Disconnecting client Exceeded max buffer (%d bytes)", currentBuffer.count)
                     conn.cancel()
                     self.removeConnection(id: id)
                     return
@@ -1188,7 +1188,7 @@ class BridgeServer {
         guard let outerJson = (try? JSONSerialization.jsonObject(with: rawLineData)) as? [String: Any],
               let outerType = outerJson["type"] as? String else {
             if !isAuth {
-                NSLog("[BridgeSecurity] Disconnecting unauthenticated client due to malformed JSON")
+                NSLog("[LinkSecurity] Disconnecting unauthenticated client due to malformed JSON")
                 conn.cancel()
                 self.removeConnection(id: id)
             }
@@ -1241,11 +1241,11 @@ class BridgeServer {
                 } else {
                     switch result.failureReason {
                     case .rateLimited:
-                        NSLog("[BridgeSecurity] Denied 'hello' due to rate limit from %@", remoteIp)
+                        NSLog("[LinkSecurity] Denied 'hello' due to rate limit from %@", remoteIp)
                     case .replayedNonce:
-                        NSLog("[BridgeSecurity] Rejected replayed hello nonce from %@", remoteIp)
+                        NSLog("[LinkSecurity] Rejected replayed hello nonce from %@", remoteIp)
                     case .invalidPayload, .invalidProof, .none:
-                        NSLog("[BridgeSecurity] Invalid SPEKE hello attempt from %@", remoteIp)
+                        NSLog("[LinkSecurity] Invalid SPEKE hello attempt from %@", remoteIp)
                     }
                     self.denyAndDisconnect(conn, id: id)
                 }
@@ -1268,7 +1268,7 @@ class BridgeServer {
                 )
 
                 if authResult.authenticated {
-                    let cipher = BridgeSessionCipher(
+                    let cipher = LinkSessionCipher(
                         sendKey: pending.material.s2cKey,
                         receiveKey: pending.material.c2sKey,
                         sendDirection: "s2c",
@@ -1286,19 +1286,19 @@ class BridgeServer {
                     )
                     self.sendPlaintext(payload: welcome, to: conn)
 
-                    if let settingsStr = BridgeNotificationManager.shared.buildSettingsSyncJson(),
+                    if let settingsStr = LinkNotificationManager.shared.buildSettingsSyncJson(),
                        let settingsData = settingsStr.data(using: .utf8) {
                         self.sendEncryptedData(settingsData, to: conn, id: id)
                     }
                     self.notifyUiStatus()
                 } else {
-                    NSLog("[BridgeSecurity] Invalid SPEKE client auth proof from %@", pending.remoteIp)
+                    NSLog("[LinkSecurity] Invalid SPEKE client auth proof from %@", pending.remoteIp)
                     self.denyAndDisconnect(conn, id: id)
                 }
                 return
             }
 
-            NSLog("[BridgeSecurity] Rejected unauthenticated message of type '%@' — disconnecting", outerType)
+            NSLog("[LinkSecurity] Rejected unauthenticated message of type '%@' — disconnecting", outerType)
             conn.cancel()
             self.removeConnection(id: id)
             return
@@ -1310,47 +1310,47 @@ class BridgeServer {
               let data = cipher.open(jsonObject: outerJson),
               let jsonObject = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let type = jsonObject["type"] as? String else {
-            NSLog("[BridgeSecurity] Disconnecting authenticated client due to unencrypted or tampered frame")
+            NSLog("[LinkSecurity] Disconnecting authenticated client due to unencrypted or tampered frame")
             conn.cancel()
             self.removeConnection(id: id)
             return
         }
 
         if type.hasPrefix("fastlink_") {
-            BridgeFastLinkManager.shared.handleControlMessage(jsonObject, fromDeviceId: id)
+            FastLinkManager.shared.handleControlMessage(jsonObject, fromDeviceId: id)
             return
         }
 
         if type.hasPrefix("notif_") || type == "settings_sync" {
-            NSLog("[BridgeServer] Routing payload of type '%@' to BridgeNotificationManager", type)
-            BridgeNotificationManager.shared.handleIncomingPayload(data: data)
+            NSLog("[LinkServer] Routing payload of type '%@' to LinkNotificationManager", type)
+            LinkNotificationManager.shared.handleIncomingPayload(data: data)
             return
         }
 
         if type.hasPrefix("device_") {
-            DispatchQueue.main.async { BridgeDeviceStatus.shared.update(from: jsonObject) }
+            DispatchQueue.main.async { LinkDeviceStatus.shared.update(from: jsonObject) }
             return
         }
 
         if type.hasPrefix("call_") {
             let deviceId = id.uuidString
-            DispatchQueue.main.async { BridgeCallManager.shared.handleIncoming(json: jsonObject, from: deviceId) }
+            DispatchQueue.main.async { LinkCallManager.shared.handleIncoming(json: jsonObject, from: deviceId) }
             return
         }
 
         if type.hasPrefix("wifi_") {
-            DispatchQueue.main.async { BridgeWifiShare.shared.handleAck(jsonObject) }
+            DispatchQueue.main.async { LinkWifiShare.shared.handleAck(jsonObject) }
             return
         }
 
         if type.hasPrefix("hotspot_") {
-            DispatchQueue.main.async { BridgePhoneInternet.shared.handleStatus(jsonObject) }
+            DispatchQueue.main.async { LinkPhoneInternet.shared.handleStatus(jsonObject) }
             return
         }
 
         if type.hasPrefix("file_") {
             let devName = self.clientDeviceNames[id] ?? "Android Device"
-            BridgeFileTransferManager.shared.handleControlMessage(jsonObject, fromDeviceId: id, deviceName: devName)
+            LinkFileTransferManager.shared.handleControlMessage(jsonObject, fromDeviceId: id, deviceName: devName)
             return
         }
         
@@ -1469,7 +1469,7 @@ class BridgeServer {
             .trimmingCharacters(in: CharacterSet(charactersIn: "[] \t\n"))
             .lowercased() ?? ""
         guard normalized == "127.0.0.1" || normalized == "::1" else { return false }
-        return BridgeBluetoothRelay.shared.isBluetoothRelayedConnection(remotePort: port.rawValue)
+        return LinkBluetoothRelay.shared.isBluetoothRelayedConnection(remotePort: port.rawValue)
     }
 
     func disconnectDevice(id: UUID) {
@@ -1730,7 +1730,7 @@ class BridgeServer {
                 let createdAt = self.connectionCreatedAt[id] ?? 0
                 let isBluetooth = self.connections[id].map { self.isBluetoothRelayConnection($0) } ?? false
                 if now - createdAt > (isBluetooth ? Self.bluetoothUnauthHandshakeTimeoutSeconds : Self.unauthHandshakeTimeoutSeconds) {
-                    NSLog("[BridgeSecurity] Closing timed-out unauthenticated connection")
+                    NSLog("[LinkSecurity] Closing timed-out unauthenticated connection")
                     staleIds.append(id)
                 }
             }

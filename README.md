@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="mac-app/Resources/BridgeLogoMark@2x.png" width="96" height="96" alt="Bridge Icon" />
+<img src="mac-app/Resources/LinkLogoMark@2x.png" width="96" height="96" alt="Link Icon" />
 
 # bridge
 
@@ -41,13 +41,13 @@ A lightweight, native open-source bridge linking your **Android phone** and your
 
 > [!NOTE]
 > **Active Open-Source Project**  
-> Bridge is an actively maintained open-source project updated on a regular basis with continuous stability enhancements, new features, and design improvements. Star the repository to follow releases and upcoming roadmap milestones.
+> Link is an actively maintained open-source project updated on a regular basis with continuous stability enhancements, new features, and design improvements. Star the repository to follow development and upcoming roadmap milestones.
 
 ---
 
 ## 📶 Offline Mode (Bluetooth)
 
-This fork works with **no Wi-Fi and no internet**: Bridge can connect your Android phone to your Mac directly over **Bluetooth LE L2CAP**, relaying the same encrypted local protocol through a loopback bridge. Wi-Fi is still used automatically whenever both devices share a network (it's faster for large files); Bluetooth is the fallback when they don't — just keep Bluetooth on.
+This fork works with **no Wi-Fi and no internet**: Link can connect your Android phone to your Mac directly over **Bluetooth LE L2CAP**, relaying the same encrypted local protocol through a loopback bridge. Wi-Fi is still used automatically whenever both devices share a network (it's faster for large files); Bluetooth is the fallback when they don't — just keep Bluetooth on.
 
 - **Android 10+** is required for the Bluetooth transport; older versions keep working over Wi-Fi/hotspot.
 - Pairing is unchanged — scan the same QR code. The phone prefers Wi-Fi when available and falls back to Bluetooth automatically.
@@ -61,7 +61,7 @@ This fork works with **no Wi-Fi and no internet**: Bridge can connect your Andro
 
 ## ⚡ What's New in v1.3.5
 
-Bridge **v1.3.5** introduces end-to-end encrypted local control transport, 2048-bit SPEKE PAKE authentication, and macOS menu bar UI stability fixes:
+Link **v1.3.5** introduces end-to-end encrypted local control transport, 2048-bit SPEKE PAKE authentication, and macOS menu bar UI stability fixes:
 
 - **2048-Bit SPEKE PAKE Handshake** — Replaced the static salted SHA-256 pairing challenge with a 2048-bit **SPEKE (Simple Password Exponential Key Exchange)** over RFC 3526 Group 14 (`hello` $\to$ `challenge` $\to$ `auth` $\to$ `welcome`), preventing offline brute-force recovery of the 6-digit pairing code from captured handshakes and providing Perfect Forward Secrecy (PFS).
 - **End-to-End AES-256-GCM Session Transport (`TCP :8765`)** — All post-handshake control and sync traffic (clipboard text/images, mirrored notifications, inline replies, settings sync, and file-transfer control headers) is now encrypted with directional **AES-256-GCM** session keys, monotonic sequence numbers, and AAD direction binding.
@@ -75,7 +75,7 @@ Bridge **v1.3.5** introduces end-to-end encrypted local control transport, 2048-
 * **Unlimited Transfers:** Transfer single files, batches, or full directory structures directly between Mac and Android with zero file size limits.
 * **Direct LAN Stream:** Transfers stream straight across your local network or hotspot with hardware-accelerated AES-GCM encryption and post-transfer SHA-256 verification.
 * **Folder Structure Integrity:** Directories are packaged cleanly without OS metadata (`.DS_Store`, `__MACOSX`, `Thumbs.db`) using fast deflate compression.
-* **Native OS Shortcuts:** Drag and drop onto the macOS menu bar icon, right-click in Finder to "Share with Bridge", or share from Android's system share sheet (`ACTION_SEND`).
+* **Native OS Shortcuts:** Drag and drop onto the macOS menu bar icon, right-click in Finder to "Share with Link", or share from Android's system share sheet (`ACTION_SEND`).
 * **Custom Save Locations:** Choose your custom downloads folder on both Mac (via persistent Security-Scoped Bookmarks) and Android (via Storage Access Framework).
 
 ### 📋 Two-Way Clipboard Synchronization (Text & Photos)
@@ -104,105 +104,44 @@ Bridge **v1.3.5** introduces end-to-end encrypted local control transport, 2048-
 
 ## 🚀 Getting Started
 
-You can install Bridge from [**GitHub Releases**](../../releases), via terminal commands (`adb` / `curl`), or by building from source.
+Link is a private, open-source app with no public releases — build it from source on your Mac and Android device.
 
 ### 1. Install on macOS (`macOS 13.0+`)
 
-**Option A — Drag-and-Drop `.dmg` Installer (Recommended):**
-1. Download **`Bridge-v*-macOS.dmg`** from the latest [**GitHub Release**](../../releases).
-2. Double-click the downloaded **`.dmg`** file and drag **`Bridge.app`** into the **Applications** folder in the installer window, then eject the **Bridge** installer drive.
-3. Launch **`Bridge.app`**. *(If macOS Gatekeeper prompts on first launch, right-click `Bridge.app` → **Open**, or run `xattr -cr /Applications/Bridge.app && open /Applications/Bridge.app` in Terminal).*
-4. The Bridge icon will appear in your top menu bar.
-
-**Option B — Install via Terminal (CLI):**
 ```bash
-TAG=$(curl -fsSL https://api.github.com/repos/badruddin-tasnim/bridge/releases/latest | grep -m1 '"tag_name"' | cut -d'"' -f4)
-curl -L -o /tmp/Bridge-macOS.dmg "https://github.com/badruddin-tasnim/bridge/releases/download/${TAG}/Bridge-${TAG}-macOS.dmg"
-hdiutil attach -nobrowse -quiet /tmp/Bridge-macOS.dmg
-rm -rf /Applications/Bridge.app && cp -R /Volumes/Bridge/Bridge.app /Applications/Bridge.app
-hdiutil detach /Volumes/Bridge -quiet
-xattr -cr /Applications/Bridge.app
-open /Applications/Bridge.app
+cd mac-app
+make install   # Builds Link.app and installs it to /Applications/Link.app
 ```
 
----
+> [!NOTE]
+> **Upgrading from an older install:** `Link.app` and the previous `Bridge.app` share the same bundle ID (`com.link.bridge`), so macOS treats them as the same app. Quit the old `Bridge.app` and delete `/Applications/Bridge.app` by hand before (or after) installing `Link.app`, then launch **Link** from `/Applications` — its icon appears in the menu bar.
 
 ### 2. Install on Android (`Android 8.0+`)
 
 > [!IMPORTANT]
 > **Why Android 14–16 Users Should Install via USB (`adb`):**
-> Bridge is a 100% open-source, non-Play utility that requires `BIND_NOTIFICATION_LISTENER_SERVICE` (to mirror notifications and send inline replies) and `BIND_ACCESSIBILITY_SERVICE` (to detect clipboard copy events in the background on Android 10+).
+> Link is a 100% open-source, non-Play utility that requires `BIND_NOTIFICATION_LISTENER_SERVICE` (to mirror notifications and send inline replies) and `BIND_ACCESSIBILITY_SERVICE` (to detect clipboard copy events in the background on Android 10+).
 >
-> On **Android 14, 15, and 16**, Google Play Protect's *Enhanced Fraud Protection* automatically blocks **any** non-Play APK downloaded from a web browser or file manager that declares these two permissions (*"App blocked to protect your device"*), and hides the *"Install anyway"* button. Installing over **USB with `adb`** from your Mac is the official Android developer installation path—it bypasses the browser sideload block **and** automatically unlocks Android 13+'s *"Restricted settings"* for Accessibility and Notification Access.
+> On **Android 14, 15, and 16**, Google Play Protect's *Enhanced Fraud Protection* automatically blocks **any** non-Play APK installed outside the Play Store that declares these two permissions (*"App blocked to protect your device"*), and hides the *"Install anyway"* button. Installing over **USB with `adb`** from your Mac is the official Android developer installation path—it bypasses the browser sideload block **and** automatically unlocks Android 13+'s *"Restricted settings"* for Accessibility and Notification Access.
 
-#### Method A: Install via USB & ADB from Your Mac *(Required on Android 14–16, Recommended for All)*
+#### Install via USB & ADB from Your Mac *(Required on Android 14–16, Recommended for All)*
 
 1. **Enable USB Debugging on your Android phone:**
    - Open **Settings → About phone** and tap **Build number** 7 times until *"You are now a developer!"* appears.
    - Open **Settings → System → Developer options** (or **Additional settings → Developer options**) and enable **USB debugging**.
 2. **Connect your phone to your Mac via USB cable** and tap **Allow** on the *"Allow USB debugging?"* prompt on your phone.
-3. **Run the following commands in your Mac Terminal:**
+3. **Build the optimized APK and install it over USB:**
    ```bash
    # Install adb if you don't already have it
    brew install --cask android-platform-tools
 
-   # Download the latest Bridge Android APK and install over USB
-   TAG=$(curl -fsSL https://api.github.com/repos/badruddin-tasnim/bridge/releases/latest | grep -m1 '"tag_name"' | cut -d'"' -f4)
-   curl -L -o /tmp/Bridge-Android.apk "https://github.com/badruddin-tasnim/bridge/releases/download/${TAG}/Bridge-${TAG}-Android.apk"
-   adb install -r /tmp/Bridge-Android.apk
+   cd android-app
+   JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew assembleOptimized
+   adb install -r app/build/outputs/apk/optimized/app-optimized.apk
    ```
 
-#### Method B: Direct APK Download on Phone *(Android 8–13 & Devices Without Play Protect Sideload Block)*
-
-1. Download **`Bridge-v*-Android.apk`** from [**GitHub Releases**](../../releases) directly on your Android phone.
-2. Open the downloaded **`.apk`** file to install it. *(If Play Protect shows a standard warning dialog, tap **More details → Install anyway**).*
-3. **Android 13 Restricted Settings:** If **Accessibility** or **Notification Access** appears grayed out after installing the APK directly, open **Settings → Apps → Bridge → ⋮ (top right) → Allow restricted settings**, then enable the permissions.
-
----
-
-### 3. Build from Source
-
-<details>
-<summary><b>Click to expand build instructions (Swift & Gradle)</b></summary>
-
-#### Prerequisites
-- **macOS:** macOS 13.0+ with Xcode Command Line Tools (`xcode-select --install`)
-- **Android:** JDK 17+ and Android SDK (`compileSdk 34`)
-
-#### Build macOS Menu Bar App
-```bash
-cd mac-app
-make clean && make
-make install   # Installs Bridge.app to /Applications/Bridge.app
-make run       # Launches Bridge in your menu bar
-make dmg       # Packages a drag-to-Applications Bridge-macOS.dmg installer
-```
-
-#### Build Android App
-```bash
-cd android-app
-./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-</details>
-
-### Verify Release Downloads
-
-All official release assets include `SHA256SUMS.txt` on the GitHub Release page. Starting in `v1.3.2`, release APKs are also signed with Bridge's dedicated Android release certificate:
-
-```bash
-# 1. Verify archive & APK checksums against SHA256SUMS.txt
-shasum -a 256 -c SHA256SUMS.txt
-
-# 2. Verify the Android APK signing certificate SHA-256 fingerprint
-apksigner verify --print-certs Bridge-*-Android.apk
-```
-
-Expected Android signing certificate SHA-256 digest:
-
-```text
-AC:40:63:01:B9:1F:9D:49:65:8D:37:12:3D:4C:D6:A7:F7:91:13:2C:D7:BB:3A:3F:51:F5:60:BD:60:B9:77:DC
-```
+> [!NOTE]
+> **Android 13 Restricted Settings:** If **Accessibility** or **Notification Access** appears grayed out after installing, open **Settings → Apps → Link → ⋮ (top right) → Allow restricted settings**, then enable the permissions.
 
 ---
 
@@ -232,14 +171,14 @@ Pairing your devices is fast, private, and requires zero account creation:
 ### Step-by-Step Instructions:
 
 1. **Connect to Same Wi-Fi:** Ensure your Android phone and Mac are connected to the same local Wi-Fi network. *(Tip: When traveling or away from home, you can also connect your Mac directly to your phone's Personal Hotspot).*
-2. **Open Bridge on Mac:** Click the **Bridge** icon in your Mac menu bar. It displays your instant QR code and 6-digit code.
+2. **Open Link on Mac:** Click the **Link** icon in your Mac menu bar. It displays your instant QR code and 6-digit code.
 3. **Scan or Type Code on Android:**
    - Tap **Scan QR code** in the Android app and point your camera at the Mac menu bar popover.
    - *Alternatively:* Enter the 6-digit pairing code shown on your Mac.
    - *Manual IP:* If on an enterprise network blocking multicast (mDNS), tap **Enter IP address instead** and click the eye icon in the bottom bar of the Mac popover to view your `IP:port`.
 4. **Grant Permissions on Android:**
-   - **Notification Access:** Allows Bridge to mirror your incoming notifications and route quick replies.
-   - **Accessibility Service:** Android 10+ restricts background apps from reading the clipboard. Bridge uses an accessibility event listener to capture copy actions without screen reading or keylogging.
+   - **Notification Access:** Allows Link to mirror your incoming notifications and route quick replies.
+   - **Accessibility Service:** Android 10+ restricts background apps from reading the clipboard. Link uses an accessibility event listener to capture copy actions without screen reading or keylogging.
    - **Battery Optimization Exemption:** Prevents OEM task killers from freezing background sync when your phone is locked.
 5. **Adding Another Phone:**
    - Click **Add another phone** in the Mac popover anytime.
@@ -255,11 +194,11 @@ Pairing your devices is fast, private, and requires zero account creation:
 
 ## 🔒 Security, Privacy & Architecture Transparency
 
-Bridge is built to be **100% local, zero-cloud, and auditable** (see [SECURITY.md](SECURITY.md) for full cryptographic specifications).
+Link is built to be **100% local, zero-cloud, and auditable** (see [SECURITY.md](SECURITY.md) for full cryptographic specifications).
 
 ### 1. 2048-Bit SPEKE PAKE Authentication & End-to-End AES-256-GCM Transport
-* **Zero-knowledge PAKE handshake (`BridgeSpeke`):** Devices authenticate using a 2048-bit **SPEKE (Simple Password Exponential Key Exchange)** over RFC 3526 Group 14 ($p = 2q + 1$). Neither the 6-digit pairing code nor any static hash of it is sent before Diffie-Hellman key agreement, preventing offline brute-force attacks against recorded handshakes and providing **Perfect Forward Secrecy (PFS)**.
-* **Encrypted control & data channels (`BridgeSessionCipher`):** All post-handshake traffic on `TCP :8765` (clipboard text/images, notifications, inline replies, settings sync, and file-transfer control messages) is encrypted with directional **AES-256-GCM** keys, monotonic 64-bit sequence numbers, and AAD direction binding. File-transfer data streams are likewise encrypted with **AES-256-GCM** and authenticated via one-way SHA-256 data-socket proofs (`computeDataSocketAuth`).
+* **Zero-knowledge PAKE handshake (`LinkSpeke`):** Devices authenticate using a 2048-bit **SPEKE (Simple Password Exponential Key Exchange)** over RFC 3526 Group 14 ($p = 2q + 1$). Neither the 6-digit pairing code nor any static hash of it is sent before Diffie-Hellman key agreement, preventing offline brute-force attacks against recorded handshakes and providing **Perfect Forward Secrecy (PFS)**.
+* **Encrypted control & data channels (`LinkSessionCipher`):** All post-handshake traffic on `TCP :8765` (clipboard text/images, notifications, inline replies, settings sync, and file-transfer control messages) is encrypted with directional **AES-256-GCM** keys, monotonic 64-bit sequence numbers, and AAD direction binding. File-transfer data streams are likewise encrypted with **AES-256-GCM** and authenticated via one-way SHA-256 data-socket proofs (`computeDataSocketAuth`).
 
 ### 2. Brute-Force & Denial-of-Service Defense
 * **Per-IP Exponential Lockout:** 5 failed handshake attempts from an IP within 60 seconds trigger an immediate 60-second lockout, doubling exponentially on consecutive violations up to 960 seconds.
@@ -269,7 +208,7 @@ Bridge is built to be **100% local, zero-cloud, and auditable** (see [SECURITY.m
 * **Bounded Buffers:** Unauthenticated connections are restricted to 8 KB max payload size (and max 4 concurrent unauthenticated sockets) to mitigate memory exhaustion and socket DoS.
 
 ### 3. Local Network Boundary Enforcement
-* Bridge rejects connections originating from public or non-private IP addresses.
+* Link rejects connections originating from public or non-private IP addresses.
 * Only local LAN addresses (RFC 1918: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, link-local `169.254.0.0/16`, CGNAT `100.64.0.0/10`, and loopback/link-local IPv6) are accepted.
 * Pairing codes on macOS are stored with strict POSIX `0600` permissions (`~/.bridge_pairing_code`).
 
@@ -280,9 +219,9 @@ Bridge is built to be **100% local, zero-cloud, and auditable** (see [SECURITY.m
 
 ### 5. Transparent Permission Usage
 
-| Permission | Exact Purpose in Bridge | Source Reference |
+| Permission | Exact Purpose in Link | Source Reference |
 | :--- | :--- | :--- |
-| `BIND_NOTIFICATION_LISTENER_SERVICE` | Reads incoming Android status bar notifications to mirror them to your Mac and delivers replies/dismissals back to apps. | [`BridgeNotificationListenerService.kt`](android-app/app/src/main/java/com/link/clipboardsync/BridgeNotificationListenerService.kt) |
+| `BIND_NOTIFICATION_LISTENER_SERVICE` | Reads incoming Android status bar notifications to mirror them to your Mac and delivers replies/dismissals back to apps. | [`LinkNotificationListenerService.kt`](android-app/app/src/main/java/com/link/clipboardsync/LinkNotificationListenerService.kt) |
 | `BIND_ACCESSIBILITY_SERVICE` | Detects copy events on Android 10+ so clipboard text can be synced without background polling. Does not read screen text or log keystrokes. | [`ClipboardSyncAccessibilityService.kt`](android-app/app/src/main/java/com/link/clipboardsync/ClipboardSyncAccessibilityService.kt) |
 | `INTERNET` | Establishes the local LAN TCP socket (`:8765`) between phone and Mac, including the Bluetooth LE L2CAP loopback relay used when no Wi-Fi is available. | [`NetworkSyncClient.kt`](android-app/app/src/main/java/com/link/clipboardsync/NetworkSyncClient.kt) |
 | `CAMERA` | Active only when scanning the pairing QR code. Video frames are decoded in memory and discarded immediately. | [`MainActivity.kt`](android-app/app/src/main/java/com/link/clipboardsync/MainActivity.kt) |

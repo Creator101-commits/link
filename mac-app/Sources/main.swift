@@ -53,7 +53,7 @@ final class StatusItemDropOverlayView: NSView {
 class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
-    private let model = BridgeModel()
+    private let model = LinkModel()
     private var lastPopoverCloseTime: TimeInterval = 0
     private var isAnimatingClose = false
     private var isFinishingAnimatedClose = false
@@ -67,7 +67,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     ]
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if let iconPath = Bundle.main.path(forResource: "Bridge", ofType: "icns"),
+        if let iconPath = Bundle.main.path(forResource: "Link", ofType: "icns"),
            let appIcon = NSImage(contentsOfFile: iconPath) {
             NSApp.applicationIconImage = appIcon
         }
@@ -80,7 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem?.button else { return }
         
-        button.image = createBridgeTemplateIcon()
+        button.image = createLinkTemplateIcon()
         button.imagePosition = .imageOnly
         button.action = #selector(togglePopover)
         button.target = self
@@ -134,7 +134,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             rawTargetHeight = ceil(fitting.height)
         } else {
             let isPaired = model.isConnected || model.pairedDevice != nil
-            let notifCount = BridgeNotificationManager.shared.activeNotifications.count
+            let notifCount = LinkNotificationManager.shared.activeNotifications.count
             if !isPaired {
                 rawTargetHeight = 494
             } else if model.selectedTab == .devices && model.showPairingSection {
@@ -143,7 +143,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 let devCount = max(1, model.connectedDevicesList.count)
                 rawTargetHeight = 240 + CGFloat(devCount) * 75.0
             } else if model.selectedTab == .files {
-                let txCount = BridgeFileTransferManager.shared.transfers.count
+                let txCount = LinkFileTransferManager.shared.transfers.count
                 rawTargetHeight = txCount == 0 ? 310 : min(340 + CGFloat(txCount) * 70.0, 580.0)
             } else if model.selectedTab == .settings {
                 rawTargetHeight = 460
@@ -183,13 +183,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func showPopover(forceBringToFront: Bool = false) {
         guard let button = statusItem?.button, let pop = popover else { return }
         if pop.contentViewController == nil {
-            let hostingController = NSHostingController(rootView: BridgeMenuView(model: model))
+            let hostingController = NSHostingController(rootView: LinkMenuView(model: model))
             if #available(macOS 13.0, *) {
                 hostingController.sizingOptions = [.preferredContentSize]
             }
             pop.contentViewController = hostingController
         }
-        BridgeNotificationManager.shared.checkNotificationAuth()
+        LinkNotificationManager.shared.checkNotificationAuth()
         applyPopoverSize()
 
         NSApp.activate(ignoringOtherApps: true)
@@ -358,7 +358,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        BridgeFastLinkManager.shared.applicationTerminating()
+        FastLinkManager.shared.applicationTerminating()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -386,7 +386,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         sender.reply(toOpenOrPrint: .success)
     }
 
-    @objc func shareWithBridge(
+    @objc func shareWithLink(
         _ pboard: NSPasteboard,
         userData: String?,
         error: AutoreleasingUnsafeMutablePointer<NSString?>
@@ -397,7 +397,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
     
-    private func createBridgeTemplateIcon() -> NSImage {
+    private func createLinkTemplateIcon() -> NSImage {
         let size = NSSize(width: 18, height: 18)
         if let path2x = Bundle.main.path(forResource: "MenuBarIcon@2x", ofType: "png"),
            let img = NSImage(contentsOfFile: path2x) {

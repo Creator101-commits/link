@@ -29,7 +29,7 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-object BridgeSpeke {
+object LinkSpeke {
     // RFC 3526 Group 14 (2048-bit MODP Safe Prime p = 2q + 1)
     const val P_HEX =
         "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
@@ -160,7 +160,7 @@ object BridgeSpeke {
     }
 }
 
-class BridgeSessionCipher(
+class LinkSessionCipher(
     private val sendKey: SecretKeySpec,
     private val receiveKey: SecretKeySpec,
     private val sendDirection: String,
@@ -234,7 +234,7 @@ class BridgeSessionCipher(
 }
 
 /**
- * Persistent TCP client to the Bridge macOS daemon.
+ * Persistent TCP client to the Link macOS daemon.
  *
  * - Newline-delimited JSON framing
  * - Pairing handshake ("hello" with pairing code -> "welcome"/"denied")
@@ -325,7 +325,7 @@ class NetworkSyncClient(private val context: Context) {
 
     @Volatile private var socket: Socket? = null
     @Volatile private var writer: PrintWriter? = null
-    @Volatile private var sessionCipher: BridgeSessionCipher? = null
+    @Volatile private var sessionCipher: LinkSessionCipher? = null
     @Volatile private var authenticated = false
     @Volatile private var currentHost: String? = null
     @Volatile private var lanHost: String? = null
@@ -349,7 +349,7 @@ class NetworkSyncClient(private val context: Context) {
     fun isActivelyConnecting(): Boolean = isRunning.get()
     fun getCurrentHost(): String? = currentHost
     fun isConnectedViaBluetooth(): Boolean =
-        currentHost == BridgeTransport.BLUETOOTH_HOST && isConnected()
+        currentHost == LinkTransport.BLUETOOTH_HOST && isConnected()
 
     fun addListener(l: SyncListener) {
         if (!listeners.contains(l)) {
@@ -514,7 +514,7 @@ class NetworkSyncClient(private val context: Context) {
                     heartbeatTick++
                     // ~64s (8 x 8s ticks)
                     if (heartbeatTick % 8 == 0) {
-                        BridgeNotificationListenerService.instance?.syncActiveIdsOnly()
+                        LinkNotificationListenerService.instance?.syncActiveIdsOnly()
                     }
                     // ~64s: NSD reports a service only once and discovery
                     // usually stops after resolve, so while on Bluetooth
@@ -522,8 +522,8 @@ class NetworkSyncClient(private val context: Context) {
                     if (heartbeatTick % 8 == 0 &&
                         isConnectedViaBluetooth() &&
                         hasWifiOrEthernetTransport() &&
-                        !BridgeFastLink.isActive() &&
-                        !BridgeFileTransferManager.hasActiveTransfers()) {
+                        !FastLink.isActive() &&
+                        !LinkFileTransferManager.hasActiveTransfers()) {
                         stopDiscovery()
                         startDiscovery()
                     }
@@ -567,7 +567,7 @@ class NetworkSyncClient(private val context: Context) {
             while (isRunning.get()) {
                 val lan = lanHost?.takeIf { isUsableLanHost(it) }
                 val wifiUp = hasWifiOrEthernetTransport()
-                val btReady = BridgeTransport.isBluetoothReady(context)
+                val btReady = LinkTransport.isBluetoothReady(context)
 
                 // Prefer the LAN socket while Wi-Fi/Ethernet is up and a usable
                 // host is known; otherwise use the Bluetooth L2CAP relay. After
@@ -575,7 +575,7 @@ class NetworkSyncClient(private val context: Context) {
                 // cannot starve the other.
                 val host = when {
                     lan != null && wifiUp && !(btReady && lastAttemptWasLan) -> lan
-                    btReady -> BridgeTransport.BLUETOOTH_HOST
+                    btReady -> LinkTransport.BLUETOOTH_HOST
                     else -> null
                 }
 
@@ -594,14 +594,14 @@ class NetworkSyncClient(private val context: Context) {
                     continue
                 }
                 discoveryWaitCount = 0
-                lastAttemptWasLan = host != BridgeTransport.BLUETOOTH_HOST
+                lastAttemptWasLan = host != LinkTransport.BLUETOOTH_HOST
                 upgradingToLan = false
                 currentHost = host
 
                 try {
-                    val isBluetoothAttempt = host == BridgeTransport.BLUETOOTH_HOST
+                    val isBluetoothAttempt = host == LinkTransport.BLUETOOTH_HOST
                     log("Connecting to Mac at $host:$currentPort...")
-                    val s = BridgeTransport.connect(
+                    val s = LinkTransport.connect(
                         context,
                         host,
                         currentPort,
@@ -624,11 +624,11 @@ class NetworkSyncClient(private val context: Context) {
 
                     val activeCode = (pairCode ?: "").replace(" ", "").trim()
                     val clientNonce = generateSecureNonce()
-                    val clientKeyPair = BridgeSpeke.generateKeyPair(
+                    val clientKeyPair = LinkSpeke.generateKeyPair(
                         pairingCode = activeCode,
                         clientNonce = clientNonce
                     )
-                    var pendingMaterial: BridgeSpeke.SessionMaterial? = null
+                    var pendingMaterial: LinkSpeke.SessionMaterial? = null
 
                     // Step 1 of SPEKE PAKE handshake: send client nonce + ephemeral public key (no password hash on the wire)
                     writePlaintext(
@@ -660,12 +660,12 @@ class NetworkSyncClient(private val context: Context) {
                                         if (serverNonce.length !in 16..128) {
                                             throw SecurityException("Invalid server nonce in challenge")
                                         }
-                                        val sharedSecretHex = BridgeSpeke.computeSharedSecret(
+                                        val sharedSecretHex = LinkSpeke.computeSharedSecret(
                                             peerPublicHex = serverPublicHex,
                                             privateScalar = clientKeyPair.privateScalar
                                         ) ?: throw SecurityException("Invalid SPEKE public key from server")
 
-                                        val material = BridgeSpeke.deriveSessionMaterial(
+                                        val material = LinkSpeke.deriveSessionMaterial(
                                             sharedSecretHex = sharedSecretHex,
                                             pairingCode = activeCode,
                                             clientNonce = clientNonce,
@@ -689,7 +689,7 @@ class NetworkSyncClient(private val context: Context) {
                                             throw SecurityException("Server failed mutual SPEKE authentication proof")
                                         }
                                         synchronized(this) {
-                                            sessionCipher = BridgeSessionCipher(
+                                            sessionCipher = LinkSessionCipher(
                                                 sendKey = material.c2sKey,
                                                 receiveKey = material.s2cKey,
                                                 sendDirection = "c2s",
@@ -699,15 +699,15 @@ class NetworkSyncClient(private val context: Context) {
                                         }
                                         failedAttempts = 0
                                         macName = (payload.name ?: "Mac").take(64)
-                                        BridgePrefs.saveHost(context, host, currentPort)
-                                        BridgePrefs.markPaired(context, macName)
+                                        LinkPrefs.saveHost(context, host, currentPort)
+                                        LinkPrefs.markPaired(context, macName)
                                         log("Paired with ${payload.name} at $host:$currentPort (SPEKE + AES-256-GCM)")
                                         notifyPairingResult(true, macName)
-                                        BridgeNotificationManager.resetActiveIdsSyncMemo()
-                                        BridgeNotificationManager.clearSentAppIcons()
+                                        LinkNotificationManager.resetActiveIdsSyncMemo()
+                                        LinkNotificationManager.clearSentAppIcons()
                                         notifyConnectionStatusChanged(true, host)
                                         startHeartbeat()
-                                        BridgeNotificationListenerService.instance?.syncActiveNotifications()
+                                        LinkNotificationListenerService.instance?.syncActiveNotifications()
                                     }
                                     "denied" -> {
                                         log("Mac rejected the pairing code.")
@@ -731,28 +731,28 @@ class NetworkSyncClient(private val context: Context) {
                                 val innerType = innerObj?.optString("type")
 
                                 if (innerType != null && innerType.startsWith("fastlink_") && innerObj != null) {
-                                    BridgeFastLink.handleControlMessage(context, innerObj)
+                                    FastLink.handleControlMessage(context, innerObj)
                                 } else if (innerType != null && innerType.startsWith("device_")) {
                                     // Phone-originated device status is not expected inbound;
                                     // reserved prefix for symmetry with the Mac router.
                                 } else if (innerType != null && innerType.startsWith("call_")) {
-                                    BridgeCallMonitor.handleControlMessage(context, innerObj)
+                                    LinkCallMonitor.handleControlMessage(context, innerObj)
                                 } else if (innerType != null && innerType.startsWith("wifi_share") && innerObj != null) {
-                                    BridgeWifiShare.handle(context, innerObj)
+                                    LinkWifiShare.handle(context, innerObj)
                                 } else if (innerType != null && innerType.startsWith("hotspot_") && innerObj != null) {
-                                    BridgeHotspotShare.handleControlMessage(context, innerObj)
+                                    LinkHotspotShare.handleControlMessage(context, innerObj)
                                 } else if (innerType != null && (innerType.startsWith("notif_") || innerType == "settings_sync")) {
                                     notifyNotificationPayloadReceived(decryptedJsonString)
                                 } else if (innerType != null && innerType.startsWith("file_") && innerObj != null) {
-                                    BridgeFileTransferManager.handleControlMessage(context, innerObj, host)
+                                    LinkFileTransferManager.handleControlMessage(context, innerObj, host)
                                 } else {
                                     val payload = ClipboardPayload.fromJsonString(decryptedJsonString)
                                     when (payload?.type) {
                                         "unpair" -> {
                                             log("Mac initiated unpair.")
                                             pairCode = null
-                                            BridgePrefs.clearPairing(context)
-                                            BridgeNotificationManager.cancelAllMacAlerts(context)
+                                            LinkPrefs.clearPairing(context)
+                                            LinkNotificationManager.cancelAllMacAlerts(context)
                                             isRunning.set(false)
                                             notifyRemoteUnpair()
                                             notifyConnectionStatusChanged(false, null)
@@ -798,9 +798,9 @@ class NetworkSyncClient(private val context: Context) {
                 } finally {
                     stopHeartbeat()
                     disconnectSocket()
-                    BridgeFastLink.onControlDisconnected()
+                    FastLink.onControlDisconnected()
                     if (!upgradingToLan) {
-                        notifyConnectionStatusChanged(false, if (BridgePrefs.isPaired(context)) host else null)
+                        notifyConnectionStatusChanged(false, if (LinkPrefs.isPaired(context)) host else null)
                     }
                 }
 
@@ -836,7 +836,7 @@ class NetworkSyncClient(private val context: Context) {
     }
 
     private fun notifyConnectionStatusChanged(isConnected: Boolean, host: String?) {
-        if (!isConnected) BridgeNotificationManager.clearSentAppIcons()
+        if (!isConnected) LinkNotificationManager.clearSentAppIcons()
         for (l in listeners) {
             try { l.onConnectionStatusChanged(isConnected, host) } catch (ignored: Exception) {}
         }
@@ -895,15 +895,15 @@ class NetworkSyncClient(private val context: Context) {
                             // While a fast-link session is up the Mac sits on the
                             // phone hotspot; its home-Wi-Fi address must not be
                             // adopted as the LAN host mid-transfer.
-                            if (BridgeFastLink.isActive()) return
+                            if (FastLink.isActive()) return
                             val host = serviceInfo.host?.hostAddress
                             val port = serviceInfo.port
                             if (host.isNullOrBlank() || host.contains(":") ||
                                 !isUsableLanHost(host) || port !in 1024..65535 ||
-                                host == BridgeFastLink.currentMacIp()) return
+                                host == FastLink.currentMacIp()) return
                             if (isConnectedViaBluetooth() &&
                                 hasWifiOrEthernetTransport() &&
-                                !BridgeFileTransferManager.hasActiveTransfers()) {
+                                !LinkFileTransferManager.hasActiveTransfers()) {
                                 // Both sides share Wi-Fi: probe, then upgrade the
                                 // control channel from Bluetooth to LAN.
                                 maybeUpgradeToLan(host, port)
@@ -962,8 +962,8 @@ class NetworkSyncClient(private val context: Context) {
             }
             // Re-verify nothing changed while probing.
             if (!isConnectedViaBluetooth() ||
-                BridgeFastLink.isActive() ||
-                BridgeFileTransferManager.hasActiveTransfers()) return@Thread
+                FastLink.isActive() ||
+                LinkFileTransferManager.hasActiveTransfers()) return@Thread
             lanHost = host
             currentPort = port
             failedAttempts = 0

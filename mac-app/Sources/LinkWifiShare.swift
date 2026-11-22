@@ -8,8 +8,8 @@ import CoreLocation
 /// Password is read from the System keychain via `/usr/bin/security` (macOS
 /// shows its own admin prompt). Never logged.
 @MainActor
-final class BridgeWifiShare: ObservableObject {
-    static let shared = BridgeWifiShare()
+final class LinkWifiShare: ObservableObject {
+    static let shared = LinkWifiShare()
 
     enum State: Equatable {
         case idle
@@ -23,7 +23,7 @@ final class BridgeWifiShare: ObservableObject {
     /// Current Wi-Fi SSID for the subtitle (nil = not on Wi-Fi).
     @Published var currentSSID: String?
 
-    /// Set by BridgeModel to the server's broadcastRawJson (String-based).
+    /// Set by LinkModel to the server's broadcastRawJson (String-based).
     var sendJsonHandler: ((String) -> Void)?
 
     /// Snapshot harness: when true, refreshSSID() is a no-op so injected SSIDs
@@ -98,7 +98,7 @@ final class BridgeWifiShare: ObservableObject {
     /// determined, else open System Settings › Privacy › Location Services.
     func handleLocationPrompt() {
         if CLLocationManager.authorizationStatus() == .notDetermined {
-            BridgeFastLinkManager.shared.requestLocationAuthorization()
+            FastLinkManager.shared.requestLocationAuthorization()
         } else {
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices") {
                 NSWorkspace.shared.open(url)

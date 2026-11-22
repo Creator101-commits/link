@@ -6,7 +6,7 @@ import android.content.SharedPreferences
 /**
  * Persistent pairing state for the Mac this phone is bridged to.
  */
-object BridgePrefs {
+object LinkPrefs {
     private const val PREFS_NAME = "ClipboardSyncPrefs"
     private const val KEY_HOST = "server_ip"
     private const val KEY_PORT = "server_port"
@@ -177,7 +177,7 @@ object BridgePrefs {
 
     fun saveHost(context: Context, host: String, port: Int) {
         // Never persist the Bluetooth sentinel; keep the last real LAN address.
-        if (host == BridgeTransport.BLUETOOTH_HOST) return
+        if (host == LinkTransport.BLUETOOTH_HOST) return
         prefs(context).edit().putString(KEY_HOST, host).putInt(KEY_PORT, port).apply()
     }
 

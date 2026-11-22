@@ -2,8 +2,8 @@ import AppKit
 
 // Renders the Link glyph (design/logo-concepts/link.svg geometry) into:
 //  - mac-app/Resources/MenuBarIcon.png (18x18) + MenuBarIcon@2x.png (36x36), black on transparent
-//  - mac-app/Resources/Bridge.icon/Assets/glyph-black.png + glyph-white.png (1024x1024)
-//  - mac-app/Resources/Bridge.iconset/*.png -> Bridge.icns via `iconutil`
+//  - mac-app/Resources/Link.icon/Assets/glyph-black.png + glyph-white.png (1024x1024)
+//  - mac-app/Resources/Link.iconset/*.png -> Link.icns via `iconutil`
 // Usage: swift render_link_icons.swift <repo-root>
 
 let root = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : FileManager.default.currentDirectoryPath
@@ -69,11 +69,11 @@ for (name, color) in [("glyph-black.png", NSColor.black), ("glyph-white.png", NS
         let origin = (side - glyphSide) / 2
         color.setFill()
         glyphPath(in: NSRect(x: origin, y: origin, width: glyphSide, height: glyphSide)).fill()
-    }, to: "\(resDir)/Bridge.icon/Assets/\(name)")
+    }, to: "\(resDir)/Link.icon/Assets/\(name)")
 }
 
 // 3. .iconset for icns: white squircle + black glyph (~58% of canvas).
-let iconset = "\(resDir)/Bridge.iconset"
+let iconset = "\(resDir)/Link.iconset"
 try? FileManager.default.removeItem(atPath: iconset)
 try? FileManager.default.createDirectory(atPath: iconset, withIntermediateDirectories: true)
 let sizes: [(String, Int)] = [

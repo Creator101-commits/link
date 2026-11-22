@@ -36,8 +36,8 @@ import java.util.concurrent.TimeUnit
  * All state is guarded by [lock]; blocking callers wait on it. The psk is
  * never logged.
  */
-object BridgeFastLink {
-    private const val TAG = "BridgeFastLink"
+object FastLink {
+    private const val TAG = "FastLink"
     private const val FAILURE_COOLDOWN_MS = 60_000L
 
     enum class DataRoute { LAN, FAST_LINK, BLUETOOTH }
@@ -102,7 +102,7 @@ object BridgeFastLink {
             return DataRoute.BLUETOOTH
         }
         val supported = isSupported(appCtx) && permissionBlockReason(appCtx) == null
-        return chooseDataRoute(controlHost, BridgePrefs.isFastLinkEnabled(appCtx), supported)
+        return chooseDataRoute(controlHost, LinkPrefs.isFastLinkEnabled(appCtx), supported)
     }
 
     // MARK: - Pure helpers (unit tested)
@@ -112,8 +112,8 @@ object BridgeFastLink {
         fastLinkEnabled: Boolean,
         fastLinkSupported: Boolean
     ): DataRoute = when {
-        controlHost != null && controlHost != BridgeTransport.BLUETOOTH_HOST -> DataRoute.LAN
-        controlHost == BridgeTransport.BLUETOOTH_HOST && fastLinkEnabled && fastLinkSupported -> DataRoute.FAST_LINK
+        controlHost != null && controlHost != LinkTransport.BLUETOOTH_HOST -> DataRoute.LAN
+        controlHost == LinkTransport.BLUETOOTH_HOST && fastLinkEnabled && fastLinkSupported -> DataRoute.FAST_LINK
         else -> DataRoute.BLUETOOTH
     }
 
@@ -351,7 +351,7 @@ object BridgeFastLink {
 
     /**
      * Returns the host the data socket should dial: the LAN control host, the
-     * [BridgeTransport.BLUETOOTH_HOST] sentinel, or the Mac's hotspot IPv4.
+     * [LinkTransport.BLUETOOTH_HOST] sentinel, or the Mac's hotspot IPv4.
      * Blocks while the fast-link session comes up; falls back to Bluetooth on
      * failure or timeout.
      */
@@ -359,7 +359,7 @@ object BridgeFastLink {
         val appCtx = ctx.applicationContext
         when (routeFor(appCtx, controlHost)) {
             DataRoute.LAN -> return controlHost
-            DataRoute.BLUETOOTH -> return BridgeTransport.BLUETOOTH_HOST
+            DataRoute.BLUETOOTH -> return LinkTransport.BLUETOOTH_HOST
             DataRoute.FAST_LINK -> {}
         }
 
@@ -387,7 +387,7 @@ object BridgeFastLink {
                     } else {
                         Log.w(TAG, "fast link unavailable: ${if (state == State.IDLE) "ended" else "timeout"}")
                     }
-                    BridgeTransport.BLUETOOTH_HOST
+                    LinkTransport.BLUETOOTH_HOST
                 }
             } finally {
                 pendingAcquires--
@@ -473,7 +473,7 @@ object BridgeFastLink {
         val host = ClipboardSyncManager.networkClient?.getCurrentHost()
         if (isInFailureCooldown(System.currentTimeMillis(), lastFailureAtMs)) return
         val supported = isSupported(appCtx) && permissionBlockReason(appCtx) == null
-        if (chooseDataRoute(host, BridgePrefs.isFastLinkEnabled(appCtx), supported) != DataRoute.FAST_LINK) return
+        if (chooseDataRoute(host, LinkPrefs.isFastLinkEnabled(appCtx), supported) != DataRoute.FAST_LINK) return
         ensureSession(appCtx)
         // End the hotspot if no transfer acquires it within 20s.
         synchronized(lock) {

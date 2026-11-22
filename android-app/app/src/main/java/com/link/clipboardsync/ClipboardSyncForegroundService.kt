@@ -61,21 +61,21 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
 
         startForegroundWithNotification(initialStatus())
 
-        // Wi-Fi lock is held per-transfer by BridgeWifiLock (LAN/fast-link
+        // Wi-Fi lock is held per-transfer by LinkWifiLock (LAN/fast-link
         // data paths only) instead of keeping the radio in high-perf mode.
 
         ClipboardSyncManager.init(this)
         ClipboardSyncManager.networkClient?.addListener(this)
-        BridgeNotificationManager.init(this)
-        BridgeDeviceStatus.start(this)
-        BridgeCallMonitor.start(this)
+        LinkNotificationManager.init(this)
+        LinkDeviceStatus.start(this)
+        LinkCallMonitor.start(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     private fun initialStatus(): String =
-        if (BridgePrefs.isPaired(this)) "Connecting to ${BridgePrefs.macName(this) ?: "Mac"}…"
-        else "Not paired. Open Bridge to connect your Mac."
+        if (LinkPrefs.isPaired(this)) "Connecting to ${LinkPrefs.macName(this) ?: "Mac"}…"
+        else "Not paired. Open Link to connect your Mac."
 
     private fun startForegroundWithNotification(statusText: String) {
         createNotificationChannel()
@@ -103,7 +103,7 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "Connection", NotificationManager.IMPORTANCE_MIN).apply {
-                description = "Keeps Bridge connected to your Mac in the background"
+                description = "Keeps Link connected to your Mac in the background"
                 setShowBadge(false)
             }
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -118,7 +118,7 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Bridge")
+            .setContentTitle("Link")
             .setContentText(statusText)
             .setOngoing(true)
             .setSilent(true)
@@ -129,17 +129,17 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
 
     override fun onConnectionStatusChanged(isConnected: Boolean, host: String?) {
         if (isConnected) {
-            BridgeDeviceStatus.onLinkReady()
-            BridgeHotspotShare.onLinkReady(this)
+            LinkDeviceStatus.onLinkReady()
+            LinkHotspotShare.onLinkReady(this)
         } else {
-            BridgeDeviceStatus.onLinkLost()
+            LinkDeviceStatus.onLinkLost()
         }
         mainHandler.post {
-            val name = BridgePrefs.macName(this) ?: "Mac"
+            val name = LinkPrefs.macName(this) ?: "Mac"
             val isActivelyConnecting = ClipboardSyncManager.networkClient?.isActivelyConnecting() == true
             updateNotification(
                 when {
-                    !BridgePrefs.isPaired(this) && !isConnected -> initialStatus()
+                    !LinkPrefs.isPaired(this) && !isConnected -> initialStatus()
                     isConnected -> "Connected with $name"
                     isActivelyConnecting -> "Reconnecting to $name…"
                     else -> "Disconnected from $name"
@@ -150,9 +150,9 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
 
     override fun onPairingResult(accepted: Boolean, macName: String?) {
         if (accepted) {
-            BridgePrefs.markPaired(this, macName)
+            LinkPrefs.markPaired(this, macName)
             mainHandler.post {
-                val name = BridgePrefs.macName(this) ?: "Mac"
+                val name = LinkPrefs.macName(this) ?: "Mac"
                 if (ClipboardSyncManager.networkClient?.isConnected() == true) {
                     updateNotification("Connected with $name")
                 }
@@ -189,7 +189,7 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
                     try {
                         ClipboardSyncManager.lastReceivedHash = hash
                         ClipboardSyncManager.isInternalMutation = true
-                        clipboardManager.setPrimaryClip(ClipData.newPlainText("Bridge", text))
+                        clipboardManager.setPrimaryClip(ClipData.newPlainText("Link", text))
                         ClipboardSyncManager.recordHistory(text, outgoing = false)
                         Log.d(TAG, "Injected remote clipboard into Android (${text.length} chars, hash: ${hash.take(8)})")
                     } catch (e: Exception) {
@@ -219,7 +219,7 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
                             ClipboardSyncManager.lastReceivedHash = hash
                             ClipboardSyncManager.lastRawImageHash = hash
                             ClipboardSyncManager.isInternalMutation = true
-                            val clipData = ClipData.newUri(contentResolver, "Bridge Image", imageUri)
+                            val clipData = ClipData.newUri(contentResolver, "Link Image", imageUri)
                             clipboardManager.setPrimaryClip(clipData)
                             ClipboardSyncManager.recordHistory("[Image]", outgoing = false)
                             Log.d(TAG, "Injected remote image into Android (${bytes.size / 1024} KB, hash=${hash.take(8)})")
@@ -236,14 +236,14 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
     }
 
     override fun onNotificationPayloadReceived(jsonString: String) {
-        BridgeNotificationManager.handleIncomingPayload(this, jsonString)
+        LinkNotificationManager.handleIncomingPayload(this, jsonString)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
         ClipboardSyncManager.networkClient?.removeListener(this)
-        BridgeDeviceStatus.stop()
-        BridgeCallMonitor.stop()
+        LinkDeviceStatus.stop()
+        LinkCallMonitor.stop()
     }
 }

@@ -6,8 +6,8 @@ import CoreWLAN
 /// stay connected (internet). Restores the previous network on disconnect or
 /// when the phone reports the hotspot off. All over the encrypted JSON channel.
 @MainActor
-final class BridgePhoneInternet: ObservableObject {
-    static let shared = BridgePhoneInternet()
+final class LinkPhoneInternet: ObservableObject {
+    static let shared = LinkPhoneInternet()
 
     enum State: Equatable {
         case idle
@@ -19,7 +19,7 @@ final class BridgePhoneInternet: ObservableObject {
     }
 
     /// Thread-safe mirror of `isConnected` for readers off the main actor
-    /// (e.g. BridgeFastLinkManager.handleOffer on fastLinkQueue).
+    /// (e.g. FastLinkManager.handleOffer on fastLinkQueue).
     nonisolated(unsafe) static var isConnectedFlag = false
 
     @Published var state: State = .idle {
@@ -46,7 +46,7 @@ final class BridgePhoneInternet: ObservableObject {
     /// Send {"type":"hotspot_request"} and wait for the phone's status.
     func request() {
         guard state == .idle || isTerminalFailure else { return }
-        guard !BridgeFastLinkManager.shared.isActive else {
+        guard !FastLinkManager.shared.isActive else {
             state = .failed("Wait for the current transfer to finish")
             return
         }
@@ -95,7 +95,7 @@ final class BridgePhoneInternet: ObservableObject {
 
     // MARK: - Incoming hotspot_status
 
-    /// Handle {"type":"hotspot_status", ...} routed from BridgeServer.
+    /// Handle {"type":"hotspot_status", ...} routed from LinkServer.
     func handleStatus(_ json: [String: Any]) {
         guard let stateName = json["state"] as? String else { return }
         switch stateName {
@@ -135,7 +135,7 @@ final class BridgePhoneInternet: ObservableObject {
         joinedSSID = ssid
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
-                try BridgeWifiJoiner.join(ssid: ssid, psk: password)
+                try LinkWifiJoiner.join(ssid: ssid, psk: password)
                 DispatchQueue.main.async {
                     guard let self = self else { return }
                     self.state = .connected(ssid: ssid)
@@ -160,7 +160,7 @@ final class BridgePhoneInternet: ObservableObject {
         let prev = previousSSID
         let wasOn = wasOnWifi
         DispatchQueue.global(qos: .userInitiated).async {
-            BridgeWifiJoiner.restore(previousSSID: prev, wasOnWifi: wasOn)
+            LinkWifiJoiner.restore(previousSSID: prev, wasOnWifi: wasOn)
         }
     }
 

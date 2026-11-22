@@ -42,7 +42,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Transport abstraction for the Bridge control channel.
+ * Transport abstraction for the Link control channel.
  *
  * Ordinary LAN hosts dial plain TCP exactly as before. The sentinel host
  * [BLUETOOTH_HOST] ("bluetooth") instead opens an insecure Bluetooth LE
@@ -52,8 +52,8 @@ import java.util.concurrent.atomic.AtomicReference
  * side relays that loopback connection to 127.0.0.1:<port>, leaving the
  * line-delimited JSON protocol byte-identical.
  */
-object BridgeTransport {
-    private const val TAG = "BridgeTransport"
+object LinkTransport {
+    private const val TAG = "LinkTransport"
 
     /** Sentinel host value meaning "connect via Bluetooth LE L2CAP". */
     const val BLUETOOTH_HOST = "bluetooth"
@@ -131,7 +131,7 @@ object BridgeTransport {
             throw IOException("Bluetooth is not available or not permitted")
         }
         val appCtx = ctx.applicationContext
-        val btId = BridgePrefs.bluetoothId(appCtx)
+        val btId = LinkPrefs.bluetoothId(appCtx)
 
         var lastError: Exception? = null
         // First attempt may reuse the cached endpoint; on any failure the cache
@@ -148,7 +148,7 @@ object BridgeTransport {
                     }
                 }
             if (endpoint == null) {
-                throw IOException("Could not find the Bridge Mac over Bluetooth")
+                throw IOException("Could not find the Link Mac over Bluetooth")
             }
             try {
                 return openRelaySocket(appCtx, endpoint, port, timeoutMs)
@@ -295,7 +295,7 @@ object BridgeTransport {
 
     /**
      * Resolves the Mac's [MacEndpoint] (BluetoothDevice + L2CAP PSM + id/name)
-     * by scanning for the Bridge GATT service and reading its info
+     * by scanning for the Link GATT service and reading its info
      * characteristic. Synchronous; intended for background threads.
      */
     fun resolveMac(ctx: Context, btId: String?, timeoutMs: Long = 10000): MacEndpoint? =

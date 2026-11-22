@@ -58,10 +58,10 @@ object ClipboardSyncManager {
                 if (networkClient == null) {
                     val client = NetworkSyncClient(context.applicationContext)
                     networkClient = client
-                    if (BridgePrefs.isPaired(context)) {
-                        client.start(BridgePrefs.host(context), BridgePrefs.port(context), BridgePrefs.code(context))
+                    if (LinkPrefs.isPaired(context)) {
+                        client.start(LinkPrefs.host(context), LinkPrefs.port(context), LinkPrefs.code(context))
                     }
-                    Log.i(TAG, "ClipboardSyncManager initialized (paired=${BridgePrefs.isPaired(context)})")
+                    Log.i(TAG, "ClipboardSyncManager initialized (paired=${LinkPrefs.isPaired(context)})")
                 }
             }
         }
@@ -70,27 +70,27 @@ object ClipboardSyncManager {
     /** Attempts to pair with a Mac. Result is delivered via SyncListener.onPairingResult. */
     fun pair(context: Context, host: String?, port: Int, code: String, btId: String? = null) {
         init(context)
-        BridgePrefs.saveCandidate(context, host, port, code, btId)
+        LinkPrefs.saveCandidate(context, host, port, code, btId)
         networkClient?.start(host, port, code)
     }
 
     /** Disconnects from the currently paired Mac without removing pairing credentials. */
     fun disconnect(context: Context) {
         networkClient?.sendDisconnectAndStop()
-        BridgeNotificationManager.cancelAllMacAlerts(context)
+        LinkNotificationManager.cancelAllMacAlerts(context)
     }
 
     /** Reconnects to the saved paired Mac using stored pairing credentials. */
     fun reconnect(context: Context) {
-        if (!BridgePrefs.isPaired(context)) return
+        if (!LinkPrefs.isPaired(context)) return
         init(context)
-        networkClient?.start(BridgePrefs.host(context), BridgePrefs.port(context), BridgePrefs.code(context))
+        networkClient?.start(LinkPrefs.host(context), LinkPrefs.port(context), LinkPrefs.code(context))
     }
 
     fun unpair(context: Context) {
-        BridgePrefs.clearPairing(context)
+        LinkPrefs.clearPairing(context)
         networkClient?.sendUnpairAndStop()
-        BridgeNotificationManager.cancelAllMacAlerts(context)
+        LinkNotificationManager.cancelAllMacAlerts(context)
         history.clear()
         historyListeners.forEach { try { it.onHistoryChanged() } catch (ignored: Exception) {} }
     }
@@ -111,9 +111,9 @@ object ClipboardSyncManager {
 
         // 1. Check for local content:// or file:// image URI first
         if (uri != null && (uri.scheme == "content" || uri.scheme == "file")) {
-            // Ignore images placed onto the Android clipboard by Bridge itself
+            // Ignore images placed onto the Android clipboard by Link itself
             if (uri.authority == ClipboardImageProvider.AUTHORITY) {
-                Log.d(TAG, "[$source] Ignoring Bridge's own ClipboardImageProvider URI")
+                Log.d(TAG, "[$source] Ignoring Link's own ClipboardImageProvider URI")
                 return true
             }
 

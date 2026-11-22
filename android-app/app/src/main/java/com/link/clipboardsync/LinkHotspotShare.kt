@@ -19,7 +19,7 @@ import org.json.JSONObject
  * notification if needed, and reports {"type":"hotspot_status",...} as the AP
  * state changes. The Mac joins once we report "ready".
  */
-object BridgeHotspotShare {
+object LinkHotspotShare {
     private const val CHANNEL_ID = "hotspot_sharing"
     private const val CHANNEL_NAME = "Hotspot sharing"
     private const val NOTIF_ID = 9201
@@ -67,8 +67,8 @@ object BridgeHotspotShare {
 
     private fun onRequest(context: Context) {
         val app = context.applicationContext
-        val name = BridgePrefs.getHotspotName(app)
-        val password = BridgePrefs.getHotspotPassword(app)
+        val name = LinkPrefs.getHotspotName(app)
+        val password = LinkPrefs.getHotspotPassword(app)
         if (name.isNullOrEmpty() || password.isNullOrEmpty()) {
             postSetupNotification(app)
             sendStatus(app, "needs_setup")
@@ -157,8 +157,8 @@ object BridgeHotspotShare {
     // MARK: - Send helpers
 
     private fun sendReady(context: Context) {
-        val name = BridgePrefs.getHotspotName(context)
-        val password = BridgePrefs.getHotspotPassword(context)
+        val name = LinkPrefs.getHotspotName(context)
+        val password = LinkPrefs.getHotspotPassword(context)
         val ssid = name ?: return
         val pass = password ?: return
         ClipboardSyncManager.networkClient?.sendRawJson(JSONObject().apply {
@@ -199,7 +199,7 @@ object BridgeHotspotShare {
         val n = androidx.core.app.NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Set up hotspot sharing")
-            .setContentText("Add your hotspot name and password in Bridge settings.")
+            .setContentText("Add your hotspot name and password in Link settings.")
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pi)

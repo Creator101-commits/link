@@ -54,7 +54,7 @@ import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
 import org.json.JSONObject
 
-class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, ClipboardSyncManager.HistoryListener, BridgeNotificationManager.SettingsListener, BridgeFileTransferManager.TransferUiListener {
+class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, ClipboardSyncManager.HistoryListener, LinkNotificationManager.SettingsListener, LinkFileTransferManager.TransferUiListener {
 
     companion object {
         const val TAB_HOME = 0
@@ -92,7 +92,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
     // Screen A: Connected + Bottom Nav Tabs
     private lateinit var layoutScreenConnected: LinearLayout
-    private lateinit var layoutTabBridge: LinearLayout
+    private lateinit var layoutTabLink: LinearLayout
     private lateinit var layoutTabFiles: LinearLayout
     private lateinit var layoutTabSettings: LinearLayout
     private lateinit var layoutBottomNav: FrameLayout
@@ -206,14 +206,14 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     // Multiple File Picker Launcher
     private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
-            BridgeFileTransferManager.sendFiles(this, uris)
+            LinkFileTransferManager.sendFiles(this, uris)
         }
     }
 
     // Folder Picker Launcher (SAF Tree Picker)
     private val folderPickerLauncher = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
-            BridgeFileTransferManager.sendFolder(this, uri)
+            LinkFileTransferManager.sendFolder(this, uri)
         }
     }
 
@@ -230,7 +230,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                     val segs = path.split(":")
                     if (segs.size > 1) segs[1] else "Custom Folder"
                 }
-                BridgePrefs.setCustomSaveLocation(this, uri.toString(), displayName)
+                LinkPrefs.setCustomSaveLocation(this, uri.toString(), displayName)
                 updateSettingsUI()
             } catch (e: Exception) {
                 Log.w("MainActivity", "Failed taking persistable URI permission: ${e.message}")
@@ -243,8 +243,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     }
 
     // Debug demo mode keeps pairing purely in-memory so real prefs are never clobbered.
-    private fun uiPaired(): Boolean = if (demoMode) demoConnected else BridgePrefs.isPaired(this)
-    private fun uiMacName(): String = if (demoMode) "MacBook Pro" else (BridgePrefs.macName(this) ?: "Mac")
+    private fun uiPaired(): Boolean = if (demoMode) demoConnected else LinkPrefs.isPaired(this)
+    private fun uiMacName(): String = if (demoMode) "MacBook Pro" else (LinkPrefs.macName(this) ?: "Mac")
 
     private fun safeGetFont(resId: Int, fallback: Typeface = Typeface.DEFAULT): Typeface {
         return try {
@@ -297,7 +297,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
 
         ClipboardSyncManager.init(this)
-        BridgeNotificationManager.init(this)
+        LinkNotificationManager.init(this)
         if (!demoMode) {
             ClipboardSyncForegroundService.start(this)
         }
@@ -329,7 +329,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 ?: intent.clipData?.let { if (it.itemCount > 0) it.getItemAt(0).uri else null }
             if (streamUri != null) {
                 selectTab(TAB_FILES)
-                BridgeFileTransferManager.sendFiles(this, listOf(streamUri))
+                LinkFileTransferManager.sendFiles(this, listOf(streamUri))
                 intent.action = Intent.ACTION_MAIN
             }
         } else if (action == Intent.ACTION_SEND_MULTIPLE) {
@@ -344,7 +344,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 }
             if (!streamUris.isNullOrEmpty()) {
                 selectTab(TAB_FILES)
-                BridgeFileTransferManager.sendFiles(this, streamUris)
+                LinkFileTransferManager.sendFiles(this, streamUris)
                 intent.action = Intent.ACTION_MAIN
             }
         }
@@ -356,8 +356,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         ClipboardSyncManager.init(this)
         ClipboardSyncManager.addHistoryListener(this)
         ClipboardSyncManager.networkClient?.addListener(this)
-        BridgeNotificationManager.addSettingsListener(this)
-        BridgeFileTransferManager.addListener(this)
+        LinkNotificationManager.addSettingsListener(this)
+        LinkFileTransferManager.addListener(this)
 
         updateAccessibilityNotice()
         updateSetupProgress()
@@ -378,8 +378,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         isResumed = false
         ClipboardSyncManager.networkClient?.removeListener(this)
         ClipboardSyncManager.removeHistoryListener(this)
-        BridgeNotificationManager.removeSettingsListener(this)
-        BridgeFileTransferManager.removeListener(this)
+        LinkNotificationManager.removeSettingsListener(this)
+        LinkFileTransferManager.removeListener(this)
     }
 
     private fun initViews() {
@@ -408,7 +408,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
         // Screen A & Bottom Nav Tabs
         layoutScreenConnected = findViewById(R.id.layoutScreenConnected)
-        layoutTabBridge = findViewById(R.id.layoutTabBridge)
+        layoutTabLink = findViewById(R.id.layoutTabLink)
         layoutTabFiles = findViewById(R.id.layoutTabFiles)
         layoutTabSettings = findViewById(R.id.layoutTabSettings)
         layoutBottomNav = findViewById(R.id.layoutBottomNav)
@@ -476,13 +476,13 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         btnToggleConnectMacSettings = findViewById(R.id.btnToggleConnectMacSettings)
         btnUnpairMacSettings = findViewById(R.id.btnUnpairMacSettings)
 
-        styleBridgeSwitch(switchNotifMaster)
-        styleBridgeSwitch(switchAndroidNotif)
-        styleBridgeSwitch(switchMacNotif)
-        styleBridgeSwitch(switchPhoneVibrate)
-        styleBridgeSwitch(switchAutoAcceptFiles)
-        styleBridgeSwitch(switchFastLink)
-        styleBridgeSwitch(switchSkipSilent)
+        styleLinkSwitch(switchNotifMaster)
+        styleLinkSwitch(switchAndroidNotif)
+        styleLinkSwitch(switchMacNotif)
+        styleLinkSwitch(switchPhoneVibrate)
+        styleLinkSwitch(switchAutoAcceptFiles)
+        styleLinkSwitch(switchFastLink)
+        styleLinkSwitch(switchSkipSilent)
 
         // Screen B
         layoutScreenPairing = findViewById(R.id.layoutScreenPairing)
@@ -517,11 +517,11 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         tvDevicePhoneName.text = if (demoMode) "Pixel 8" else phoneModel
 
         // Prefill server IP if saved
-        BridgePrefs.host(this)?.let { etServerIp.setText(it) }
-        BridgePrefs.port(this).let { etServerPort.setText(it.toString()) }
+        LinkPrefs.host(this)?.let { etServerIp.setText(it) }
+        LinkPrefs.port(this).let { etServerPort.setText(it.toString()) }
     }
 
-    private fun styleBridgeSwitch(sw: SwitchCompat) {
+    private fun styleLinkSwitch(sw: SwitchCompat) {
         val states = arrayOf(
             intArrayOf(android.R.attr.state_checked),
             intArrayOf(-android.R.attr.state_checked)
@@ -570,7 +570,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         tvLargeTitle.text = when (tabIndex) {
             TAB_FILES -> "Files"
             TAB_SETTINGS -> "Settings"
-            else -> "Bridge"
+            else -> "Link"
         }
 
         // 2. Animate the sliding indicator pill across 3 tabs
@@ -690,7 +690,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
 
         btnClearCompletedTransfers.setOnClickListener {
-            BridgeFileTransferManager.clearCompletedTransfers()
+            LinkFileTransferManager.clearCompletedTransfers()
         }
 
         btnEnableAccessibility.setOnClickListener {
@@ -725,13 +725,13 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
         switchNotifMaster.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
-            BridgePrefs.setNotifMasterEnabled(this, isChecked, updateTimestamp = true)
+            LinkPrefs.setNotifMasterEnabled(this, isChecked, updateTimestamp = true)
             if (!isChecked) {
-                BridgeNotificationManager.cancelAllMacAlerts(this)
-            } else if (BridgePrefs.isAndroidNotifEnabled(this)) {
-                BridgeNotificationListenerService.instance?.syncActiveNotifications()
+                LinkNotificationManager.cancelAllMacAlerts(this)
+            } else if (LinkPrefs.isAndroidNotifEnabled(this)) {
+                LinkNotificationListenerService.instance?.syncActiveNotifications()
             }
-            BridgeNotificationManager.sendSettingsToMac(this)
+            LinkNotificationManager.sendSettingsToMac(this)
             updateAccessibilityNotice()
             updateSetupProgress()
             updateSettingsUI()
@@ -740,11 +740,11 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
         switchAndroidNotif.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
-            BridgePrefs.setAndroidNotifEnabled(this, isChecked, updateTimestamp = true)
-            if (isChecked && BridgePrefs.isNotifMasterEnabled(this)) {
-                BridgeNotificationListenerService.instance?.syncActiveNotifications()
+            LinkPrefs.setAndroidNotifEnabled(this, isChecked, updateTimestamp = true)
+            if (isChecked && LinkPrefs.isNotifMasterEnabled(this)) {
+                LinkNotificationListenerService.instance?.syncActiveNotifications()
             }
-            BridgeNotificationManager.sendSettingsToMac(this)
+            LinkNotificationManager.sendSettingsToMac(this)
             updateAccessibilityNotice()
             updateSetupProgress()
             updateSettingsUI()
@@ -753,18 +753,18 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
         switchMacNotif.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
-            BridgePrefs.setMacNotifEnabled(this, isChecked, updateTimestamp = true)
+            LinkPrefs.setMacNotifEnabled(this, isChecked, updateTimestamp = true)
             if (!isChecked) {
-                BridgeNotificationManager.cancelAllMacAlerts(this)
+                LinkNotificationManager.cancelAllMacAlerts(this)
             }
-            BridgeNotificationManager.sendSettingsToMac(this)
+            LinkNotificationManager.sendSettingsToMac(this)
             updateSettingsUI()
             updateUI()
         }
 
         switchPhoneVibrate.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
-            BridgePrefs.setPhoneVibrateEnabled(this, isChecked)
+            LinkPrefs.setPhoneVibrateEnabled(this, isChecked)
             updateSettingsUI()
         }
 
@@ -781,30 +781,30 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
 
         btnResetSaveLocation.setOnClickListener {
-            BridgePrefs.setCustomSaveLocation(this, null, null)
+            LinkPrefs.setCustomSaveLocation(this, null, null)
             updateSettingsUI()
         }
 
         switchAutoAcceptFiles.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
-            BridgePrefs.setAutoAcceptFilesEnabled(this, isChecked, updateTimestamp = true)
-            BridgeNotificationManager.sendSettingsToMac(this)
+            LinkPrefs.setAutoAcceptFilesEnabled(this, isChecked, updateTimestamp = true)
+            LinkNotificationManager.sendSettingsToMac(this)
             updateSettingsUI()
         }
 
         switchFastLink.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
-            BridgePrefs.setFastLinkEnabled(this, isChecked)
+            LinkPrefs.setFastLinkEnabled(this, isChecked)
             if (isChecked) {
-                BridgeFastLink.clearFailureCooldown()
+                FastLink.clearFailureCooldown()
                 ensureBluetoothPermissions()
             }
         }
 
         switchSkipSilent.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
-            BridgePrefs.setSkipSilentNotificationsEnabled(this, isChecked, updateTimestamp = true)
-            BridgeNotificationManager.sendSettingsToMac(this)
+            LinkPrefs.setSkipSilentNotificationsEnabled(this, isChecked, updateTimestamp = true)
+            LinkNotificationManager.sendSettingsToMac(this)
             updateSettingsUI()
         }
 
@@ -871,7 +871,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
             var host = etServerIp.text.toString().trim()
             if (host.isEmpty()) {
-                host = BridgePrefs.host(this) ?: ""
+                host = LinkPrefs.host(this) ?: ""
             }
             val port = etServerPort.text.toString().toIntOrNull() ?: NetworkSyncClient.DEFAULT_PORT
 
@@ -922,7 +922,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             tvHeroCautionText.text = if (noTransportAvailable()) {
                 "Turn on Bluetooth to connect without Wi-Fi."
             } else {
-                "Bridge couldn't reach your Mac. Please verify the following:"
+                "Link couldn't reach your Mac. Please verify the following:"
             }
         }
 
@@ -984,7 +984,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 val rawPort = json.optInt("port", NetworkSyncClient.DEFAULT_PORT)
                 val port = if (rawPort in 1024..65535) rawPort else NetworkSyncClient.DEFAULT_PORT
                 val btId = json.optString("bt").trim()
-                    .takeIf { BridgeTransport.isValidBluetoothId(it) }
+                    .takeIf { LinkTransport.isValidBluetoothId(it) }
 
                 if (code.length == 6 && code.all { it.isDigit() }) {
                     etPairCode.setText(code)
@@ -1122,7 +1122,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             layoutServiceNotice.visibility = View.VISIBLE
         }
 
-        if (currentTab != TAB_HOME || isNotificationServiceEnabled() || !BridgePrefs.isNotificationSyncEnabled(this)) {
+        if (currentTab != TAB_HOME || isNotificationServiceEnabled() || !LinkPrefs.isNotificationSyncEnabled(this)) {
             layoutNotificationNotice.visibility = View.GONE
         } else {
             layoutNotificationNotice.visibility = View.VISIBLE
@@ -1139,19 +1139,19 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private fun updateSettingsUI() {
         isUpdatingSettingsUi = true
         try {
-            val masterEnabled = BridgePrefs.isNotifMasterEnabled(this)
-            val androidEnabled = BridgePrefs.isAndroidNotifEnabled(this)
-            val macEnabled = BridgePrefs.isMacNotifEnabled(this)
-            val vibrateEnabled = BridgePrefs.isPhoneVibrateEnabled(this)
-            val autoAcceptFiles = BridgePrefs.isAutoAcceptFilesEnabled(this)
+            val masterEnabled = LinkPrefs.isNotifMasterEnabled(this)
+            val androidEnabled = LinkPrefs.isAndroidNotifEnabled(this)
+            val macEnabled = LinkPrefs.isMacNotifEnabled(this)
+            val vibrateEnabled = LinkPrefs.isPhoneVibrateEnabled(this)
+            val autoAcceptFiles = LinkPrefs.isAutoAcceptFilesEnabled(this)
 
             switchNotifMaster.isChecked = masterEnabled
             switchAndroidNotif.isChecked = androidEnabled
             switchMacNotif.isChecked = macEnabled
             switchPhoneVibrate.isChecked = vibrateEnabled
             switchAutoAcceptFiles.isChecked = autoAcceptFiles
-            switchFastLink.isChecked = BridgePrefs.isFastLinkEnabled(this)
-            switchSkipSilent.isChecked = BridgePrefs.isSkipSilentNotificationsEnabled(this)
+            switchFastLink.isChecked = LinkPrefs.isFastLinkEnabled(this)
+            switchSkipSilent.isChecked = LinkPrefs.isSkipSilentNotificationsEnabled(this)
 
             switchAndroidNotif.isEnabled = masterEnabled
             switchMacNotif.isEnabled = masterEnabled
@@ -1162,8 +1162,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             switchPhoneVibrate.isEnabled = macEffective
             rowPhoneVibrate.alpha = if (macEffective) 1.0f else 0.42f
 
-            val customSaveUri = BridgePrefs.getCustomSaveTreeUri(this)
-            val customSaveName = BridgePrefs.getCustomSaveDisplayName(this)
+            val customSaveUri = LinkPrefs.getCustomSaveTreeUri(this)
+            val customSaveName = LinkPrefs.getCustomSaveDisplayName(this)
             if (!customSaveUri.isNullOrBlank() && !customSaveName.isNullOrBlank()) {
                 tvSaveLocationPath.text = customSaveName
                 btnResetSaveLocation.visibility = View.VISIBLE
@@ -1173,7 +1173,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             }
 
             tvHotspotName.text = if (demoMode) "Pixel 8 Hotspot"
-                else BridgePrefs.getHotspotName(this) ?: "Not set up"
+                else LinkPrefs.getHotspotName(this) ?: "Not set up"
 
             if (isNotificationServiceEnabled()) {
                 tvSettingNotifAccessStatus.text = "Active"
@@ -1238,7 +1238,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     }
 
     private fun renderTransfersList() {
-        val items = BridgeFileTransferManager.transfers.toList()
+        val items = LinkFileTransferManager.transfers.toList()
         val hasCompleted = items.any { it.status == TransferStatus.COMPLETED }
         btnClearCompletedTransfers.visibility = if (hasCompleted) View.VISIBLE else View.GONE
         btnClearCompletedTransfers.setTextColor(colorAccent)
@@ -1263,7 +1263,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             val isCompleted = item.status == TransferStatus.COMPLETED
             val openAction = {
                 if (isCompleted) {
-                    BridgeFileTransferManager.openTransferredFile(this@MainActivity, item)
+                    LinkFileTransferManager.openTransferredFile(this@MainActivity, item)
                 }
             }
 
@@ -1478,44 +1478,44 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                     if (item.direction == TransferDirection.INCOMING) {
                         actionsRow.addView(
                             makeActionButton("Accept", colorOnAccent, R.drawable.bg_button_lime) {
-                                BridgeFileTransferManager.acceptIncomingFile(this, item.id)
+                                LinkFileTransferManager.acceptIncomingFile(this, item.id)
                             }
                         )
                     }
                     actionsRow.addView(
                         makeIconActionButton("Cancel transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
-                            BridgeFileTransferManager.cancelTransfer(item.id)
+                            LinkFileTransferManager.cancelTransfer(item.id)
                         }
                     )
                 }
                 TransferStatus.TRANSFERRING -> {
                     actionsRow.addView(
                         makeIconActionButton("Pause transfer", R.drawable.sf_pause, colorSecondaryLabel) {
-                            BridgeFileTransferManager.pauseTransfer(item.id)
+                            LinkFileTransferManager.pauseTransfer(item.id)
                         }
                     )
                     actionsRow.addView(
                         makeIconActionButton("Cancel transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
-                            BridgeFileTransferManager.cancelTransfer(item.id)
+                            LinkFileTransferManager.cancelTransfer(item.id)
                         }
                     )
                 }
                 TransferStatus.PAUSED -> {
                     actionsRow.addView(
                         makeIconActionButton("Resume transfer", R.drawable.sf_play, colorAccent) {
-                            BridgeFileTransferManager.resumeTransfer(this, item.id)
+                            LinkFileTransferManager.resumeTransfer(this, item.id)
                         }
                     )
                     actionsRow.addView(
                         makeIconActionButton("Cancel transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
-                            BridgeFileTransferManager.cancelTransfer(item.id)
+                            LinkFileTransferManager.cancelTransfer(item.id)
                         }
                     )
                 }
                 TransferStatus.HASHING, TransferStatus.VERIFYING -> {
                     actionsRow.addView(
                         makeIconActionButton("Cancel transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
-                            BridgeFileTransferManager.cancelTransfer(item.id)
+                            LinkFileTransferManager.cancelTransfer(item.id)
                         }
                     )
                 }
@@ -1525,19 +1525,19 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 TransferStatus.FAILED -> {
                     actionsRow.addView(
                         makeIconActionButton("Retry transfer", R.drawable.sf_arrow_clockwise, colorAccent) {
-                            BridgeFileTransferManager.retryTransfer(this, item.id)
+                            LinkFileTransferManager.retryTransfer(this, item.id)
                         }
                     )
                     actionsRow.addView(
                         makeIconActionButton("Dismiss transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
-                            BridgeFileTransferManager.dismissTransfer(item.id)
+                            LinkFileTransferManager.dismissTransfer(item.id)
                         }
                     )
                 }
                 TransferStatus.CANCELLED -> {
                     actionsRow.addView(
                         makeIconActionButton("Dismiss transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
-                            BridgeFileTransferManager.dismissTransfer(item.id)
+                            LinkFileTransferManager.dismissTransfer(item.id)
                         }
                     )
                 }
@@ -1617,7 +1617,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
     private fun isNotificationServiceEnabled(): Boolean {
         val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: return false
-        val expected = "${packageName}/${BridgeNotificationListenerService::class.java.canonicalName}"
+        val expected = "${packageName}/${LinkNotificationListenerService::class.java.canonicalName}"
         return flat.split(':').any { it.equals(expected, ignoreCase = true) || it.contains(packageName) }
     }
 
@@ -1682,11 +1682,11 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         pendingDemoState = null
         when (state) {
             "pairing" -> {
-                BridgePrefs.clearPairing(this)
+                LinkPrefs.clearPairing(this)
                 selectTab(TAB_HOME)
             }
             "home", "files", "files_empty", "settings" -> {
-                BridgeFileTransferManager.transfers.clear()
+                LinkFileTransferManager.transfers.clear()
                 if (state == "files") {
                     val active = FileTransferItem(
                         id = "demo-active", fileName = "Quarterly Report.pdf",
@@ -1710,7 +1710,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                     )
                     failed.status = TransferStatus.FAILED
                     failed.errorMessage = "Connection lost during transfer."
-                    BridgeFileTransferManager.transfers.addAll(listOf(active, done, failed))
+                    LinkFileTransferManager.transfers.addAll(listOf(active, done, failed))
                 }
                 when (state) {
                     "files", "files_empty" -> selectTab(TAB_FILES)
@@ -1789,7 +1789,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                     tvHeroCautionText.text = if (noTransportAvailable()) {
                         "Turn on Bluetooth to connect without Wi-Fi."
                     } else {
-                        "Bridge couldn't reach your Mac. Please verify the following:"
+                        "Link couldn't reach your Mac. Please verify the following:"
                     }
                 } else {
                     layoutHeroCautionBanner.visibility = View.GONE
@@ -1961,7 +1961,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
         if (grants.values.all { it }) {
-            BridgeFastLink.clearFailureCooldown()
+            FastLink.clearFailureCooldown()
             if (uiPaired()) {
                 ClipboardSyncManager.reconnect(this)
             }
@@ -1980,7 +1980,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             }
         }
         // Fast transfers need hotspot permissions too when enabled.
-        if (BridgePrefs.isFastLinkEnabled(this) && BridgeFastLink.isSupported(this)) {
+        if (LinkPrefs.isFastLinkEnabled(this) && FastLink.isSupported(this)) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 needed += Manifest.permission.NEARBY_WIFI_DEVICES
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -2002,13 +2002,13 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
     /** True when neither LAN nor Bluetooth can currently carry a connection. */
     private fun noTransportAvailable(): Boolean =
-        !isLocalNetworkAvailable(this) && !BridgeTransport.isBluetoothReady(this)
+        !isLocalNetworkAvailable(this) && !LinkTransport.isBluetoothReady(this)
 
     private fun connectionErrorNote(): String =
         if (noTransportAvailable()) {
             "Turn on Bluetooth to connect without Wi-Fi."
         } else {
-            "Couldn't reach your Mac. Make sure Bluetooth is on (or both are on the same Wi-Fi) and Bridge is open on your Mac."
+            "Couldn't reach your Mac. Make sure Bluetooth is on (or both are on the same Wi-Fi) and Link is open on your Mac."
         }
 
     private fun requestPhonePermissions() {
@@ -2024,16 +2024,16 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         if (needed.isNotEmpty()) {
             requestPermissions(needed, 4101)
         } else {
-            BridgeDeviceStatus.refresh(this)
-            BridgeCallMonitor.refresh(this)
+            LinkDeviceStatus.refresh(this)
+            LinkCallMonitor.refresh(this)
         }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 4101) {
-            BridgeDeviceStatus.refresh(this)
-            BridgeCallMonitor.refresh(this)
+            LinkDeviceStatus.refresh(this)
+            LinkCallMonitor.refresh(this)
             refreshFinishSetupCard()
         }
     }
@@ -2063,8 +2063,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         val etName = view.findViewById<EditText>(R.id.etHotspotName)
         val tilPassword = view.findViewById<TextInputLayout>(R.id.tilHotspotPassword)
         val etPassword = view.findViewById<TextInputEditText>(R.id.etHotspotPassword)
-        etName.setText(BridgePrefs.getHotspotName(this) ?: "")
-        etPassword.setText(BridgePrefs.getHotspotPassword(this) ?: "")
+        etName.setText(LinkPrefs.getHotspotName(this) ?: "")
+        etPassword.setText(LinkPrefs.getHotspotPassword(this) ?: "")
         // Show/hide password toggle.
         tilPassword.setEndIconOnClickListener {
             val showing = etPassword.inputType and InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD != 0
@@ -2081,7 +2081,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 val name = etName.text.toString().trim()
                 val pass = etPassword.text.toString()
                 if (name.isNotEmpty() && pass.isNotEmpty()) {
-                    BridgePrefs.setHotspot(this, name, pass)
+                    LinkPrefs.setHotspot(this, name, pass)
                     updateSettingsUI()
                 }
             }

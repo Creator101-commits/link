@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Link application theme — system light/dark, SF Pro, transparent edge-to-edge bars -->
-    <style name="Theme.Bridge" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.Link" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/accent</item>
         <item name="colorPrimaryVariant">@color/accent</item>
         <item name="colorOnPrimary">@color/on_accent</item>
@@ -14,10 +14,10 @@
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
         <item name="fontFamily">@font/sf_pro_text</item>
         <item name="android:fontFamily">@font/sf_pro_text</item>
-        <item name="textAppearanceButton">@style/TextAppearance.Bridge.Button</item>
+        <item name="textAppearanceButton">@style/TextAppearance.Link.Button</item>
     </style>
 
-    <style name="TextAppearance.Bridge.Button" parent="TextAppearance.MaterialComponents.Button">
+    <style name="TextAppearance.Link.Button" parent="TextAppearance.MaterialComponents.Button">
         <item name="android:letterSpacing">0</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:textStyle">normal</item>
@@ -26,7 +26,7 @@
     </style>
 
     <!-- Backward compatibility alias -->
-    <style name="Theme.ClipboardSync" parent="Theme.Bridge" />
+    <style name="Theme.ClipboardSync" parent="Theme.Link" />
 
     <!-- Invisible transparent theme for clipboard focus helper -->
     <style name="Theme.Transparent" parent="android:Theme.Translucent.NoTitleBar">

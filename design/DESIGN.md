@@ -1,6 +1,6 @@
-# Bridge — Design System
+# Link — Design System
 
-Bridge should feel like a small utility Apple shipped: a menu bar popover on the Mac, a quiet companion app on Android. Reference: the Vorssaint menu bar panel (tab strip, small-caps section headers, soft filled cards, system-blue accent, Settings / Quit footer). Inspiration only — no Vorssaint code or assets (it is GPL; Bridge is MIT).
+Link should feel like a small utility Apple shipped: a menu bar popover on the Mac, a quiet companion app on Android. Reference: the Vorssaint menu bar panel (tab strip, small-caps section headers, soft filled cards, system-blue accent, Settings / Quit footer). Inspiration only — no Vorssaint code or assets (it is GPL; Link is MIT).
 
 Personal build, not distributed: SF Pro is used on both platforms by owner decision.
 
@@ -13,11 +13,11 @@ Personal build, not distributed: SF Pro is used on both platforms by owner decis
 
 ## Brand
 
-- Name: **Bridge** (title case in UI).
+- Name: **Link** (title case in UI).
 - Mark: the **Link** glyph — `design/logo-concepts/link.svg` (two brackets joined by a bar). Monochrome only.
   - Mac menu bar: template image from the glyph, 18×18 pt (with @2x).
   - Popover header: glyph, 26 pt tall, `.primary`, centered (as Vorssaint centers its logo).
-  - Mac app icon: update `Resources/Bridge.icon` (Icon Composer): light = white fill + black glyph; dark = near-black fill + white glyph; tinted = glyph. Regenerate `Bridge.icns` (white squircle, black glyph) for the fallback.
+  - Mac app icon: update `Resources/Link.icon` (Icon Composer): light = white fill + black glyph; dark = near-black fill + white glyph; tinted = glyph. Regenerate `Link.icns` (white squircle, black glyph) for the fallback.
   - Android launcher: adaptive icon, white background + black glyph, plus a `monochrome` layer (themed icons, Android 13+). Notification small icon: white glyph on transparent.
   - In-app (Android hero, pairing screen): glyph in `label` color.
 
@@ -78,7 +78,7 @@ Top to bottom, like Vorssaint:
 5. **Footer** — two equal buttons, 8-radius, glass on macOS 26+ (fallback primary 0.06 fill): `gearshape` Settings, `power` Quit. Settings replaces the content with the settings sections (tab strip shows no selection; a back chevron + "Settings" title appears in the section header row).
 
 Screens:
-- **Not paired** — header, then a card with the QR code (white card, 168 pt), the pairing code in SF Mono below, "Scan with Bridge on your Android phone" subtitle, and a disclosure row "Other ways to connect" (IP/port, Bluetooth ID). No tab strip until paired.
+- **Not paired** — header, then a card with the QR code (white card, 168 pt), the pairing code in SF Mono below, "Scan with Link on your Android phone" subtitle, and a disclosure row "Other ways to connect" (IP/port, Bluetooth ID). No tab strip until paired.
 - **Devices** — this Mac + the phone as rows (name, transport, IP masked behind the existing reveal toggle), transport status row (Wi-Fi / Bluetooth / Hotspot with SF Symbols `wifi`, `antenna.radiowaves.left.and.right`, `personalhotspot`), fast-link status line when active, "Pair another device" plain row, Unpair as a red plain text button at the bottom of the card group.
 - **Notifications** — each notification is a card: app icon (from the phone) 28 pt radius 6, app name 11 secondary + relative time trailing, title 13 semibold, body 12 (3 lines), actions as small bordered buttons (8-radius, primary 0.08 fill), inline reply field. Empty state: centered `bell.slash` 28 pt tertiary + "No notifications" + one line of secondary text.
 - **Transfers** — drop zone card (dashed 1 pt separator stroke, `arrow.down.doc` icon, "Drop files to send to your phone"; highlights with accentSoft while dragging), then transfer cards: file-type SF Symbol tile, name, size · speed · ETA, thin accent progress bar (3 pt, capsule, track primary 0.08), pause/cancel icon buttons; completed shows checkmark (green) + "Show in Finder"; failed shows red text.

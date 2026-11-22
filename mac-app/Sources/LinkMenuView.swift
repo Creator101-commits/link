@@ -15,7 +15,7 @@ private extension Color {
     static let bridgeOrange = Color(nsColor: .systemOrange)
 }
 
-struct BridgeGlass: ViewModifier {
+struct LinkGlass: ViewModifier {
     var radius: CGFloat = 12
     /// Snapshot harness sets this so glass falls back to the spec fill+stroke
     /// (glassEffect does not rasterize under cacheDisplay).
@@ -39,7 +39,7 @@ struct BridgeGlass: ViewModifier {
 
 private extension View {
     func bridgeGlass(radius: CGFloat = 12) -> some View {
-        modifier(BridgeGlass(radius: radius))
+        modifier(LinkGlass(radius: radius))
     }
 }
 
@@ -100,7 +100,7 @@ struct LinkGlyphView: View {
 
 // MARK: - Shared Components
 
-struct BridgeCard<Content: View>: View {
+struct LinkCard<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
         content
@@ -137,15 +137,15 @@ struct SectionHeader: View {
 }
 
 struct StatusCapsule: View {
-    @ObservedObject var deviceStatus = BridgeDeviceStatus.shared
-    let model: BridgeModel
+    @ObservedObject var deviceStatus = LinkDeviceStatus.shared
+    let model: LinkModel
 
     private var state: (color: Color, text: String) {
         if model.isConnected {
             let transport = model.isConnectedOverBluetooth
                 ? "Bluetooth"
-                : (BridgeFastLinkManager.shared.stateDescription == "Hotspot" ? "Hotspot" : "Wi-Fi")
-            let battery = BridgeDeviceStatus.shared.status?.battery
+                : (FastLinkManager.shared.stateDescription == "Hotspot" ? "Hotspot" : "Wi-Fi")
+            let battery = LinkDeviceStatus.shared.status?.battery
             let suffix = battery.map { " · \($0)%" } ?? ""
             return (.bridgeGreen, "Connected · \(transport)\(suffix)")
         } else if model.pairedDevice != nil {
@@ -240,8 +240,8 @@ struct MaskedIpToggleView: View {
 // MARK: - Notification Card
 
 struct NotificationCardView: View {
-    let notification: BridgeNotification
-    @ObservedObject var manager: BridgeNotificationManager
+    let notification: LinkNotification
+    @ObservedObject var manager: LinkNotificationManager
 
     private var replyBinding: Binding<String> {
         Binding(
@@ -430,7 +430,7 @@ struct NotificationCardView: View {
 
 struct FileTransferCardView: View {
     @ObservedObject var item: FileTransferItem
-    let manager: BridgeFileTransferManager
+    let manager: LinkFileTransferManager
 
     private var isFailed: Bool {
         if case .failed = item.status { return true }
@@ -662,7 +662,7 @@ struct FileTransferCardView: View {
 // MARK: - Settings Subviews
 
 struct MacSaveLocationRow: View {
-    @ObservedObject var fileTransferManager: BridgeFileTransferManager
+    @ObservedObject var fileTransferManager: LinkFileTransferManager
 
     var body: some View {
         HStack {
@@ -705,17 +705,17 @@ struct MacSaveLocationRow: View {
 
 // MARK: - Main Menu Bar View
 
-struct BridgeMenuView: View {
+struct LinkMenuView: View {
     /// Snapshot-harness only: render just the Apps settings section.
     static var snapshotAppsOnly = false
 
-    @ObservedObject var model: BridgeModel
-    @ObservedObject var notifManager: BridgeNotificationManager = BridgeNotificationManager.shared
-    @ObservedObject var fileTransferManager: BridgeFileTransferManager = BridgeFileTransferManager.shared
+    @ObservedObject var model: LinkModel
+    @ObservedObject var notifManager: LinkNotificationManager = LinkNotificationManager.shared
+    @ObservedObject var fileTransferManager: LinkFileTransferManager = LinkFileTransferManager.shared
     @ObservedObject var axObserver: AXNotificationObserver = AXNotificationObserver.shared
-    @ObservedObject var fastLinkManager: BridgeFastLinkManager = BridgeFastLinkManager.shared
-    @ObservedObject var deviceStatus: BridgeDeviceStatus = BridgeDeviceStatus.shared
-    @ObservedObject var callManager: BridgeCallManager = BridgeCallManager.shared
+    @ObservedObject var fastLinkManager: FastLinkManager = FastLinkManager.shared
+    @ObservedObject var deviceStatus: LinkDeviceStatus = LinkDeviceStatus.shared
+    @ObservedObject var callManager: LinkCallManager = LinkCallManager.shared
     @State private var expandedNotifApps: Set<String> = []
 
     private var isPairedOrConnected: Bool {
@@ -791,7 +791,7 @@ struct BridgeMenuView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func tabButton(tab: BridgeModel.BridgeTab, systemName: String, badge: Int?, help: String) -> some View {
+    private func tabButton(tab: LinkModel.LinkTab, systemName: String, badge: Int?, help: String) -> some View {
         let selected = model.selectedTab == tab
         return Button(action: {
             if model.selectedTab != tab { model.selectedTab = tab }
@@ -889,7 +889,7 @@ struct BridgeMenuView: View {
             VStack(spacing: 8) {
                 phoneStatusCard
                 // Devices: This Mac + phones in ONE grouped card with hairlines
-                BridgeCard {
+                LinkCard {
                     VStack(spacing: 0) {
                         deviceLine(
                             icon: "laptopcomputer",
@@ -934,7 +934,7 @@ struct BridgeMenuView: View {
                 }
 
                 // Transport status card
-                BridgeCard {
+                LinkCard {
                     VStack(spacing: 0) {
                         transportLine(icon: "wifi", name: "Wi-Fi", active: activeTransport == .wifi)
                         deviceHairline
@@ -1027,11 +1027,11 @@ struct BridgeMenuView: View {
 
     // MARK: - Actions card (Wi-Fi share + phone internet)
 
-    @ObservedObject private var wifiShare = BridgeWifiShare.shared
-    @ObservedObject private var phoneInternet = BridgePhoneInternet.shared
+    @ObservedObject private var wifiShare = LinkWifiShare.shared
+    @ObservedObject private var phoneInternet = LinkPhoneInternet.shared
 
     private var actionsCard: some View {
-        BridgeCard {
+        LinkCard {
             VStack(spacing: 0) {
                 actionRow(
                     icon: "wifi",
@@ -1098,7 +1098,7 @@ struct BridgeMenuView: View {
         switch phoneInternet.state {
         case .idle: return "Turns on your phone's hotspot"
         case .waitingForPhone: return "Waiting for your phone…"
-        case .needsSetup: return "Set your hotspot name and password in Bridge on your phone"
+        case .needsSetup: return "Set your hotspot name and password in Link on your phone"
         case .joining: return "Joining…"
         case .connected(let ssid): return "Connected to \(ssid)"
         case .failed(let msg): return msg
@@ -1259,7 +1259,7 @@ struct BridgeMenuView: View {
                     notificationWarningBanner(
                         icon: "bell.badge.fill",
                         title: "Mac Banners Disabled",
-                        subtitle: "Allow Bridge in System Settings → Notifications to display mirrored notifications.",
+                        subtitle: "Allow Link in System Settings → Notifications to display mirrored notifications.",
                         action: { notifManager.openNotificationSettings() }
                     )
                 }
@@ -1335,7 +1335,7 @@ struct BridgeMenuView: View {
         let pkg: String
         let name: String
         let level: String
-        let notifs: [BridgeNotification]   // newest first
+        let notifs: [LinkNotification]   // newest first
         var id: String { pkg }
         var newestTimestamp: Int64 { notifs.first?.timestamp ?? 0 }
     }
@@ -1343,7 +1343,7 @@ struct BridgeMenuView: View {
     /// Group active notifications by package; "high" apps sort first, the rest
     /// by newest notification timestamp.
     private var appStacks: [AppStack] {
-        var groups: [String: [BridgeNotification]] = [:]
+        var groups: [String: [LinkNotification]] = [:]
         for n in notifManager.activeNotifications {
             let key = n.pkg ?? (n.app ?? "notifications")
             groups[key, default: []].append(n)
@@ -1417,7 +1417,7 @@ struct BridgeMenuView: View {
 
     private func appStackIcon(_ pkg: String) -> some View {
         Group {
-            if let img = BridgeAppIconCache.shared.image(pkg: pkg) {
+            if let img = LinkAppIconCache.shared.image(pkg: pkg) {
                 Image(nsImage: img).resizable().aspectRatio(contentMode: .fit)
             } else {
                 Image(systemName: "app.fill").foregroundStyle(.secondary)
@@ -1596,9 +1596,9 @@ struct BridgeMenuView: View {
     @ViewBuilder
     private var appsSettingsSection: some View {
         settingsSection(title: "Apps") {
-            BridgeCard {
+            LinkCard {
                 VStack(alignment: .leading, spacing: 0) {
-                    let apps = BridgeNotificationManager.appList(
+                    let apps = LinkNotificationManager.appList(
                         displayNames: notifManager.appDisplayNames,
                         rules: notifManager.appRules
                     )
@@ -1628,7 +1628,7 @@ struct BridgeMenuView: View {
         } else {
         VStack(alignment: .leading, spacing: 14) {
                 settingsSection(title: "Notifications") {
-                    BridgeCard {
+                    LinkCard {
                         VStack(alignment: .leading, spacing: 10) {
                             settingsToggleRow(
                                 title: "Notifications",
@@ -1675,7 +1675,7 @@ struct BridgeMenuView: View {
                 }
 
                 settingsSection(title: "Phone") {
-                    BridgeCard {
+                    LinkCard {
                         VStack(alignment: .leading, spacing: 10) {
                             lowBatterySettingsRow
                         }
@@ -1685,7 +1685,7 @@ struct BridgeMenuView: View {
                 appsSettingsSection
 
                 settingsSection(title: "Transfers") {
-                    BridgeCard {
+                    LinkCard {
                         VStack(alignment: .leading, spacing: 10) {
                             settingsToggleRow(
                                 title: "Auto-Accept Incoming Files",
@@ -1705,13 +1705,13 @@ struct BridgeMenuView: View {
                 }
 
                 settingsSection(title: "Permissions") {
-                    BridgeCard {
+                    LinkCard {
                         VStack(alignment: .leading, spacing: 0) {
                             if !notifManager.isSystemNotificationAllowed {
                                 settingsPermissionRow(
                                     icon: "bell.badge.fill",
                                     title: "Mac Banner Notifications",
-                                    subtitle: "Allow Bridge in System Settings → Notifications.",
+                                    subtitle: "Allow Link in System Settings → Notifications.",
                                     action: { notifManager.openNotificationSettings() }
                                 )
                             }
@@ -1733,7 +1733,7 @@ struct BridgeMenuView: View {
                                 settingsPermissionRow(
                                     icon: "folder.badge.gearshape",
                                     title: "Mac Files & Folders Access",
-                                    subtitle: "Allow Bridge to send files from your Documents folder.",
+                                    subtitle: "Allow Link to send files from your Documents folder.",
                                     action: { fileTransferManager.openFilesAndFoldersSettings() }
                                 )
                             }
@@ -1754,7 +1754,7 @@ struct BridgeMenuView: View {
                 }
 
                 settingsSection(title: "About") {
-                    BridgeCard {
+                    LinkCard {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text("Version")
@@ -1842,7 +1842,7 @@ struct BridgeMenuView: View {
         }
     }
 
-    private func batteryIcon(for st: BridgeDeviceStatus.Status) -> some View {
+    private func batteryIcon(for st: LinkDeviceStatus.Status) -> some View {
         let level = st.battery ?? 0
         let name: String
         if st.charging == true {
@@ -1857,7 +1857,7 @@ struct BridgeMenuView: View {
 
     // MARK: - Call card
 
-    private func callCard(_ call: BridgeCallManager.CallInfo) -> some View {
+    private func callCard(_ call: LinkCallManager.CallInfo) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "person.fill")
                 .font(.system(size: 16))
@@ -1870,7 +1870,7 @@ struct BridgeMenuView: View {
                     .lineLimit(1)
                 if call.state == .active {
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        Text("On phone · \(BridgeCallManager.formatElapsed(BridgeCallManager.elapsedSeconds(since: call.startedAt)))")
+                        Text("On phone · \(LinkCallManager.formatElapsed(LinkCallManager.elapsedSeconds(since: call.startedAt)))")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -1906,7 +1906,7 @@ struct BridgeMenuView: View {
 
     private func appRuleRow(pkg: String, level: String) -> some View {
         HStack(spacing: 10) {
-            if let icon = BridgeAppIconCache.shared.image(pkg: pkg) {
+            if let icon = LinkAppIconCache.shared.image(pkg: pkg) {
                 Image(nsImage: icon)
                     .resizable().aspectRatio(contentMode: .fit)
                     .frame(width: 20, height: 20)
@@ -2046,7 +2046,7 @@ struct BridgeMenuView: View {
             }
             .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
 
-            Text("Scan with Bridge on your Android phone")
+            Text("Scan with Link on your Android phone")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -2087,7 +2087,7 @@ struct BridgeMenuView: View {
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                         Spacer()
-                        Text(BridgeBluetoothRelay.bluetoothId)
+                        Text(LinkBluetoothRelay.bluetoothId)
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.secondary)
                             .lineLimit(1)

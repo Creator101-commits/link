@@ -9,8 +9,8 @@ import android.util.Log
  * data path is LAN or the fast-link hotspot (never for Bluetooth relay).
  * Replaces the old always-on high-performance lock in the foreground service.
  */
-object BridgeWifiLock {
-    private const val TAG = "BridgeWifiLock"
+object LinkWifiLock {
+    private const val TAG = "LinkWifiLock"
     private val lock = Any()
     private var refs = 0
     private var wifiLock: WifiManager.WifiLock? = null
@@ -25,7 +25,7 @@ object BridgeWifiLock {
                     @Suppress("DEPRECATION")
                     wifiLock = wm.createWifiLock(
                         WifiManager.WIFI_MODE_FULL_HIGH_PERF,
-                        "Bridge::TransferWifiLock"
+                        "Link::TransferWifiLock"
                     ).apply {
                         setReferenceCounted(false)
                         acquire()

@@ -15,6 +15,7 @@ android-app/local.properties
 
 # macOS compiled app bundle (built via `make` or downloaded from GitHub Releases)
 mac-app/Bridge.app/
+mac-app/Link.app/
 
 # Local release staging artifacts (uploaded to GitHub Releases)
 releases/

@@ -1,27 +1,27 @@
-# Contributing to Bridge
+# Contributing to Link
 
-Thank you for your interest in contributing to **Bridge**! Our mission is to build an open, ultra-fast, native, and privacy-first continuity bridge between Android and macOS without third-party cloud accounts, telemetry, or proprietary lock-in.
+Thank you for your interest in contributing to **Link**! Our mission is to build an open, ultra-fast, native, and privacy-first continuity bridge between Android and macOS without third-party cloud accounts, telemetry, or proprietary lock-in.
 
 ---
 
 ## 🛠️ Local Development Setup
 
-Bridge is structured as a native multi-platform repository:
+Link is structured as a native multi-platform repository:
 
 ### 1. macOS Menu Bar App (`mac-app/`)
 - **Stack:** Swift, SwiftUI, AppKit (`NSPopover` + `NSStatusItem`), `CryptoKit` (AES-GCM), `Network.framework` (`NWListener`), UserNotifications, UniformTypeIdentifiers.
-- **Extensions:** Finder Quick Action (`BridgeQuickAction.appex`) and macOS Share Extension (`BridgeShare.appex`).
+- **Extensions:** Finder Quick Action (`LinkQuickAction.appex`) and macOS Share Extension (`LinkShare.appex`).
 - **Requirements:** macOS 13.0+ and Xcode Command Line Tools (`xcode-select --install`).
 - **Build & Run:**
   ```bash
   cd mac-app
   make clean && make
-  make install   # Installs to /Applications/Bridge.app
-  make run       # Launches Bridge in your menu bar
+  make install   # Installs to /Applications/Link.app
+  make run       # Launches Link in your menu bar
   ```
 
 ### 2. Android App (`android-app/`)
-- **Stack:** Kotlin, Jetpack, Coroutines, custom `Canvas` animations (`BridgeLinkView`), `Socket` + `NsdManager` (mDNS/Bonjour), Storage Access Framework (SAF), NotificationListenerService, AccessibilityService.
+- **Stack:** Kotlin, Jetpack, Coroutines, custom `Canvas` animations (`LinkLinkView`), `Socket` + `NsdManager` (mDNS/Bonjour), Storage Access Framework (SAF), NotificationListenerService, AccessibilityService.
 - **Requirements:** JDK 17+ and Android SDK (`compileSdk 34`, `minSdk 26`).
 - **Build & Install:**
   ```bash
@@ -34,7 +34,7 @@ Bridge is structured as a native multi-platform repository:
 
 ## 📡 Wire Protocol Specification (`TCP :8765`)
 
-Bridge uses newline-delimited JSON (`\n`) for metadata control framing over a persistent TCP socket on port `8765`, discovered automatically on the local network via Bonjour (`_clipboardsync._tcp`). High-speed binary file streams utilize framed AES-GCM data chunks.
+Link uses newline-delimited JSON (`\n`) for metadata control framing over a persistent TCP socket on port `8765`, discovered automatically on the local network via Bonjour (`_clipboardsync._tcp`). High-speed binary file streams utilize framed AES-GCM data chunks.
 
 ### Control & Data Message Types
 
@@ -65,7 +65,7 @@ Bridge uses newline-delimited JSON (`\n`) for metadata control framing over a pe
 1. **Native & Lightweight Above All:**
    - Prefer native platform APIs (`Network.framework`, `CryptoKit`, `android.net.nsd`, `java.security`) over bloated external dependencies.
 2. **Zero-Cloud & Zero-Telemetry:**
-   - Bridge will **never** include third-party tracking, analytics, or cloud infrastructure. All features must work 100% peer-to-peer on a local network or hotspot.
+   - Link will **never** include third-party tracking, analytics, or cloud infrastructure. All features must work 100% peer-to-peer on a local network or hotspot.
 3. **No Plaintext Logging:**
    - Never log raw clipboard text, notification messages, replies, or file payloads to `Logcat` or console output. Use truncated SHA-256 hashes for debugging.
 4. **Security & Sanitization:**

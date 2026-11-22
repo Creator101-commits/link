@@ -38,7 +38,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Bridge"
+                android:text="Link"
                 android:textColor="@color/label"
                 android:fontFamily="@font/sf_pro_display_bold"
                 android:textSize="34sp"
@@ -377,7 +377,7 @@
 
             <!-- TAB 1: HOME OVERVIEW -->
             <LinearLayout
-                android:id="@+id/layoutTabBridge"
+                android:id="@+id/layoutTabLink"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipChildren="false"
@@ -403,7 +403,7 @@
                         android:layout_height="44dp"
                         android:layout_gravity="center_horizontal"
                         android:layout_marginBottom="14dp"
-                        android:contentDescription="Bridge"
+                        android:contentDescription="Link"
                         android:src="@drawable/link_glyph"
                         app:tint="@color/label" />
 
@@ -491,7 +491,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="Bridge couldn't reach your Mac. Please verify the following:"
+                        android:text="Link couldn't reach your Mac. Please verify the following:"
                         android:textColor="@color/red"
                         android:fontFamily="@font/sf_pro_text"
                         android:textSize="13sp"
@@ -509,7 +509,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="• Make sure Bridge is running on your Mac."
+                            android:text="• Make sure Link is running on your Mac."
                             android:textColor="@color/secondary_label"
                             android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
@@ -1617,7 +1617,7 @@
                 android:layout_height="64dp"
                 android:layout_gravity="center_horizontal"
                 android:layout_marginTop="40dp"
-                android:contentDescription="Bridge"
+                android:contentDescription="Link"
                 android:src="@drawable/link_glyph"
                 app:tint="@color/label" />
 
@@ -1643,7 +1643,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="Open Bridge from your Mac\'s menu bar. Scan the QR code displayed on your Mac or enter its pairing code below."
+                android:text="Open Link from your Mac\'s menu bar. Scan the QR code displayed on your Mac or enter its pairing code below."
                 android:textColor="@color/secondary_label"
                 android:fontFamily="@font/sf_pro_text"
                 android:textSize="14.5sp"
@@ -1674,7 +1674,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="10dp"
-                    android:text="Couldn't reach your Mac. Make sure Bluetooth is on (or both are on the same Wi-Fi) and Bridge is open on your Mac."
+                    android:text="Couldn't reach your Mac. Make sure Bluetooth is on (or both are on the same Wi-Fi) and Link is open on your Mac."
                     android:textColor="@color/red"
                     android:fontFamily="@font/sf_pro_text"
                     android:textSize="14sp"

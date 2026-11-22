@@ -5,8 +5,8 @@ import CryptoKit
 import UserNotifications
 import zlib
 
-class BridgeFileTransferManager: ObservableObject {
-    static let shared = BridgeFileTransferManager()
+class LinkFileTransferManager: ObservableObject {
+    static let shared = LinkFileTransferManager()
 
     @Published var transfers: [FileTransferItem] = []
     @Published var autoAcceptIncomingFiles: Bool {
@@ -138,7 +138,7 @@ class BridgeFileTransferManager: ObservableObject {
         }
         self.customSavePath = UserDefaults.standard.string(forKey: Self.keyCustomSaveLocation)
         self.onAutoAcceptChanged = {
-            BridgeNotificationManager.shared.recordLocalSettingsChangeAndSync()
+            LinkNotificationManager.shared.recordLocalSettingsChangeAndSync()
         }
     }
 
@@ -181,7 +181,7 @@ class BridgeFileTransferManager: ObservableObject {
     // MARK: - Public Outgoing API (Mac -> Android)
 
     func sendFiles(urls: [URL], to device: ConnectedDeviceInfo) {
-        NSLog("[BridgeFile] sendFiles: %ld URLs to %@", urls.count, device.name)
+        NSLog("[LinkFile] sendFiles: %ld URLs to %@", urls.count, device.name)
         for url in urls {
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else {
@@ -524,7 +524,7 @@ class BridgeFileTransferManager: ObservableObject {
 
     func handleControlMessage(_ jsonObject: [String: Any], fromDeviceId: UUID, deviceName: String) {
         guard let type = jsonObject["type"] as? String else { return }
-        NSLog("[BridgeFile] handleControlMessage: type=%@, id=%@", type, (jsonObject["id"] as? String) ?? "")
+        NSLog("[LinkFile] handleControlMessage: type=%@, id=%@", type, (jsonObject["id"] as? String) ?? "")
 
         switch type {
         case "file_request":
@@ -567,7 +567,7 @@ class BridgeFileTransferManager: ObservableObject {
                 self.onTransferListChanged?()
 
                 let shouldAutoAccept = self.autoAcceptIncomingFiles && !item.isExecutable
-                NSLog("[BridgeFile] file_request for '%@', autoAccept=%d, isExec=%d -> shouldAutoAccept=%d", cleanName, self.autoAcceptIncomingFiles ? 1 : 0, item.isExecutable ? 1 : 0, shouldAutoAccept ? 1 : 0)
+                NSLog("[LinkFile] file_request for '%@', autoAccept=%d, isExec=%d -> shouldAutoAccept=%d", cleanName, self.autoAcceptIncomingFiles ? 1 : 0, item.isExecutable ? 1 : 0, shouldAutoAccept ? 1 : 0)
                 if shouldAutoAccept {
                     self.acceptIncomingTransfer(item)
                 } else {
@@ -1194,7 +1194,7 @@ class BridgeFileTransferManager: ObservableObject {
             )
             center.add(req) { error in
                 if let error = error {
-                    NSLog("[BridgeFile] Error posting incoming transfer banner: \(error.localizedDescription)")
+                    NSLog("[LinkFile] Error posting incoming transfer banner: \(error.localizedDescription)")
                 }
             }
         }
@@ -1229,7 +1229,7 @@ class BridgeFileTransferManager: ObservableObject {
 
     // MARK: - In-Process Fast Zip Packaging Engine
 
-    private class BridgeZipWriter {
+    private class LinkZipWriter {
         struct Entry {
             let path: String
             let isDirectory: Bool
@@ -1256,7 +1256,7 @@ class BridgeFileTransferManager: ObservableObject {
         }
 
         func addDirectory(relPath: String, modDate: Date = Date()) throws {
-            guard !shouldAbort() else { throw NSError(domain: "BridgeZip", code: -1, userInfo: [NSLocalizedDescriptionKey: "Aborted"]) }
+            guard !shouldAbort() else { throw NSError(domain: "LinkZip", code: -1, userInfo: [NSLocalizedDescriptionKey: "Aborted"]) }
             let cleanPath = relPath.hasSuffix("/") ? relPath : "\(relPath)/"
             let pathBytes = [UInt8](cleanPath.utf8)
             let (dosDate, dosTime) = toDosTime(modDate)
@@ -1291,7 +1291,7 @@ class BridgeFileTransferManager: ObservableObject {
         }
 
         func addFile(fileUrl: URL, relPath: String) throws {
-            guard !shouldAbort() else { throw NSError(domain: "BridgeZip", code: -1, userInfo: [NSLocalizedDescriptionKey: "Aborted"]) }
+            guard !shouldAbort() else { throw NSError(domain: "LinkZip", code: -1, userInfo: [NSLocalizedDescriptionKey: "Aborted"]) }
             let pathBytes = [UInt8](relPath.utf8)
             let attrs = try FileManager.default.attributesOfItem(atPath: fileUrl.path)
             let modDate = (attrs[.modificationDate] as? Date) ?? Date()
@@ -1338,7 +1338,7 @@ class BridgeFileTransferManager: ObservableObject {
             var totalBytesWritten: UInt64 = 0
 
             while true {
-                guard !shouldAbort() else { throw NSError(domain: "BridgeZip", code: -1, userInfo: [NSLocalizedDescriptionKey: "Aborted"]) }
+                guard !shouldAbort() else { throw NSError(domain: "LinkZip", code: -1, userInfo: [NSLocalizedDescriptionKey: "Aborted"]) }
                 let chunk = inHandle.readData(ofLength: bufferSize)
                 if chunk.isEmpty { break }
                 chunk.withUnsafeBytes { ptr in
@@ -1495,7 +1495,7 @@ class BridgeFileTransferManager: ObservableObject {
 
     // MARK: - Folder Packaging & Extraction
 
-    enum BridgePackageError: LocalizedError {
+    enum LinkPackageError: LocalizedError {
         case permissionDenied
         case cancelled
         case empty
@@ -1540,7 +1540,7 @@ class BridgeFileTransferManager: ObservableObject {
         return false
     }
 
-    static func packageFolderToZip(folderUrl: URL, transferId: String, shouldAbort: @escaping () -> Bool) -> Result<(zipUrl: URL, size: Int64, sha256: String), BridgePackageError> {
+    static func packageFolderToZip(folderUrl: URL, transferId: String, shouldAbort: @escaping () -> Bool) -> Result<(zipUrl: URL, size: Int64, sha256: String), LinkPackageError> {
         let tempZipName = "bridge_pkg_\(transferId).zip"
         let tempZipUrl = FileManager.default.temporaryDirectory.appendingPathComponent(tempZipName)
         try? FileManager.default.removeItem(at: tempZipUrl)
@@ -1564,10 +1564,10 @@ class BridgeFileTransferManager: ObservableObject {
         }
 
         let startTime = Date()
-        NSLog("[BridgeFile] packageFolderToZip starting for '%@'...", folderUrl.path)
+        NSLog("[LinkFile] packageFolderToZip starting for '%@'...", folderUrl.path)
 
         do {
-            let writer = try BridgeZipWriter(url: tempZipUrl, shouldAbort: shouldAbort)
+            let writer = try LinkZipWriter(url: tempZipUrl, shouldAbort: shouldAbort)
             let parentName = folderUrl.lastPathComponent
 
             // Add top-level folder entry
@@ -1619,9 +1619,9 @@ class BridgeFileTransferManager: ObservableObject {
 
             try writer.finish()
             let duration = Date().timeIntervalSince(startTime)
-            NSLog("[BridgeFile] packageFolderToZip finished in %.2fs (%ld files)", duration, entryCount)
+            NSLog("[LinkFile] packageFolderToZip finished in %.2fs (%ld files)", duration, entryCount)
         } catch {
-            NSLog("[BridgeFile] packageFolderToZip error: %@", error.localizedDescription)
+            NSLog("[LinkFile] packageFolderToZip error: %@", error.localizedDescription)
             try? FileManager.default.removeItem(at: tempZipUrl)
             return .failure(.failed("Failed to package folder: \(error.localizedDescription)"))
         }
@@ -1811,7 +1811,7 @@ class BridgeFileTransferManager: ObservableObject {
     }
 
     static func hasEnoughDiskSpace(requiredBytes: Int64) -> Bool {
-        let targetUrl = BridgeFileTransferManager.shared.effectiveSaveDirectory
+        let targetUrl = LinkFileTransferManager.shared.effectiveSaveDirectory
         if let values = try? targetUrl.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
            let available = values.volumeAvailableCapacityForImportantUsage {
             return available >= (requiredBytes + Self.minFreeDiskSpaceMargin)

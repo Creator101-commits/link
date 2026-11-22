@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ClipboardSync"
+rootProject.name = "Link"
 include(":app")

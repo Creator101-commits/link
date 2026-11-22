@@ -1,6 +1,6 @@
 # Design screenshots
 
-Visual reference captures for the Bridge rebrand (see `../DESIGN.md`). Mac shots render `BridgeMenuView` via `mac-app/scripts/snapshot/main.swift` (`make snapshots` in `mac-app/`); Android shots come from the debug demo mode (`demo_state` intent extra) on a Pixel 8 API 34 emulator.
+Visual reference captures for the Link rebrand (see `../DESIGN.md`). Mac shots render `LinkMenuView` via `mac-app/scripts/snapshot/main.swift` (`make snapshots` in `mac-app/`); Android shots come from the debug demo mode (`demo_state` intent extra) on a Pixel 8 API 34 emulator.
 
 ## macOS (menu-bar popover, 360pt wide)
 

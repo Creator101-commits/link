@@ -97,7 +97,7 @@ class FileTransferItem(
     val createdAt: Long = System.currentTimeMillis()
 ) {
     val isExecutable: Boolean
-        get() = if (isFolder) false else BridgeFileTransferManager.isExecutable(fileName)
+        get() = if (isFolder) false else LinkFileTransferManager.isExecutable(fileName)
 
     @Volatile var bytesTransferred: Long = 0L
     @Volatile var speedBytesPerSec: Double = 0.0
@@ -113,13 +113,13 @@ class FileTransferItem(
         get() = (progress * 100f).roundToInt()
 
     val formattedTotalSize: String
-        get() = BridgeFileTransferManager.formatBytes(fileSize)
+        get() = LinkFileTransferManager.formatBytes(fileSize)
 
     val formattedProgressSize: String
-        get() = "${BridgeFileTransferManager.formatBytes(bytesTransferred)} / ${BridgeFileTransferManager.formatBytes(fileSize)}"
+        get() = "${LinkFileTransferManager.formatBytes(bytesTransferred)} / ${LinkFileTransferManager.formatBytes(fileSize)}"
 
     val formattedSpeed: String
-        get() = if (speedBytesPerSec > 0) "${BridgeFileTransferManager.formatBytes(speedBytesPerSec.toLong())}/s" else ""
+        get() = if (speedBytesPerSec > 0) "${LinkFileTransferManager.formatBytes(speedBytesPerSec.toLong())}/s" else ""
 
     val remainingTimeText: String
         get() {
@@ -176,8 +176,8 @@ class FileTransferItem(
         }
 }
 
-object BridgeFileTransferManager {
-    private const val TAG = "BridgeFileTransfer"
+object LinkFileTransferManager {
+    private const val TAG = "LinkFileTransfer"
     private const val CHUNK_SIZE = 64 * 1024 // 64 KB chunk size for hardware-accelerated AES-GCM framing
     private const val SOCKET_BUFFER_SIZE = 2 * 1024 * 1024 // 2 MB TCP window buffer
     private const val HASH_CHUNK_SIZE = 1024 * 1024 // 1 MB
@@ -275,8 +275,8 @@ object BridgeFileTransferManager {
     fun sendFiles(context: Context, uris: List<Uri>) {
         val appCtx = context.applicationContext
         appContext = appCtx
-        BridgeFastLink.prewarm(appCtx)
-        val macName = BridgePrefs.macName(appCtx) ?: "Mac"
+        FastLink.prewarm(appCtx)
+        val macName = LinkPrefs.macName(appCtx) ?: "Mac"
         Log.d(TAG, "sendFiles called with ${uris.size} URIs to $macName")
 
         for (uri in uris) {
@@ -348,7 +348,7 @@ object BridgeFileTransferManager {
     fun sendFolder(context: Context, treeUri: Uri) {
         val appCtx = context.applicationContext
         appContext = appCtx
-        val macName = BridgePrefs.macName(appCtx) ?: "Mac"
+        val macName = LinkPrefs.macName(appCtx) ?: "Mac"
 
         try {
             appCtx.contentResolver.takePersistableUriPermission(
@@ -484,17 +484,17 @@ object BridgeFileTransferManager {
      * falls back to the Bluetooth relay for this attempt.
      */
     private fun openDataSocket(ctx: Context, controlHost: String, port: Int): DataSocketResult {
-        val dataHost = BridgeFastLink.acquireDataHost(ctx, controlHost)
-        val isBt = dataHost == BridgeTransport.BLUETOOTH_HOST
+        val dataHost = FastLink.acquireDataHost(ctx, controlHost)
+        val isBt = dataHost == LinkTransport.BLUETOOTH_HOST
         val isFastLink = dataHost != controlHost && !isBt
         if (!isFastLink) {
-            val s = BridgeTransport.connect(ctx, dataHost, port, if (isBt) 15000 else 5000)
+            val s = LinkTransport.connect(ctx, dataHost, port, if (isBt) 15000 else 5000)
             return DataSocketResult(s, dataHost, isBt)
         }
         var lastError: Exception? = null
         for (attempt in 0 until 3) {
             try {
-                val s = BridgeTransport.connect(ctx, dataHost, port, 3000)
+                val s = LinkTransport.connect(ctx, dataHost, port, 3000)
                 return DataSocketResult(s, dataHost, false)
             } catch (e: Exception) {
                 lastError = e
@@ -508,8 +508,8 @@ object BridgeFileTransferManager {
             }
         }
         Log.w(TAG, "Fast link data path failed (${lastError?.message}); falling back to Bluetooth relay")
-        BridgeFastLink.reportDataPathFailure()
-        val s = BridgeTransport.connect(ctx, BridgeTransport.BLUETOOTH_HOST, port, 15000)
+        FastLink.reportDataPathFailure()
+        val s = LinkTransport.connect(ctx, LinkTransport.BLUETOOTH_HOST, port, 15000)
         return DataSocketResult(s, dataHost, true)
     }
 
@@ -548,7 +548,7 @@ object BridgeFileTransferManager {
                 input = BufferedInputStream(rawInput, CHUNK_SIZE)
 
                 val appCtx = context.applicationContext
-                if (BridgeFastLink.routeFor(appCtx, host) == BridgeFastLink.DataRoute.FAST_LINK) {
+                if (FastLink.routeFor(appCtx, host) == FastLink.DataRoute.FAST_LINK) {
                     item.statusNote = "Starting fast transfer…"
                     notifyUi()
                 }
@@ -556,7 +556,7 @@ object BridgeFileTransferManager {
                 dataHost = conn.acquiredHost
                 item.statusNote = null
                 if (!conn.viaBluetooth) {
-                    BridgeWifiLock.acquire(appCtx)
+                    LinkWifiLock.acquire(appCtx)
                     wifiLockHeld = true
                 }
                 val s = conn.socket
@@ -671,8 +671,8 @@ object BridgeFileTransferManager {
                 dismissProgressNotification(context, item.id)
                 try { input?.close() } catch (_: Exception) {}
                 try { sock?.close() } catch (_: Exception) {}
-                dataHost?.let { BridgeFastLink.releaseDataHost(it) }
-                if (wifiLockHeld) BridgeWifiLock.release()
+                dataHost?.let { FastLink.releaseDataHost(it) }
+                if (wifiLockHeld) LinkWifiLock.release()
                 activeSockets.remove(item.id)
                 if (item.isFolder && (item.status.isFinished || cancelledIds.contains(item.id))) {
                     item.tempArchiveFile?.delete()
@@ -694,7 +694,7 @@ object BridgeFileTransferManager {
 
         val resolvedHost = macHost
             ?: ClipboardSyncManager.networkClient?.getCurrentHost()
-            ?: BridgePrefs.host(appCtx)
+            ?: LinkPrefs.host(appCtx)
 
         when (type) {
             "file_offer" -> {
@@ -707,7 +707,7 @@ object BridgeFileTransferManager {
                 val isFolder = jsonObj.optBoolean("isFolder", false)
 
                 if (size <= 0L || port <= 0 || token.isBlank() || resolvedHost.isNullOrBlank()) return
-                BridgeFastLink.prewarm(appCtx)
+                FastLink.prewarm(appCtx)
 
                 val cleanName = sanitizeFileName(rawName)
                 val targetFileName = if (isFolder && !cleanName.endsWith(".zip", ignoreCase = true)) "$cleanName.zip" else cleanName
@@ -744,7 +744,7 @@ object BridgeFileTransferManager {
                         fileSize = size,
                         expectedSha256 = sha256,
                         direction = TransferDirection.INCOMING,
-                        deviceName = BridgePrefs.macName(appCtx) ?: "Mac",
+                        deviceName = LinkPrefs.macName(appCtx) ?: "Mac",
                         partFile = partFile,
                         isFolder = isFolder,
                         status = TransferStatus.WAITING_CONFIRMATION,
@@ -756,7 +756,7 @@ object BridgeFileTransferManager {
                 }
                 notifyUi()
 
-                val shouldAutoAccept = (isResume || BridgePrefs.isAutoAcceptFilesEnabled(appCtx)) && (isFolder || !isExecutable(cleanName))
+                val shouldAutoAccept = (isResume || LinkPrefs.isAutoAcceptFilesEnabled(appCtx)) && (isFolder || !isExecutable(cleanName))
                 if (shouldAutoAccept) {
                     acceptIncomingFile(appCtx, item.id)
                 } else {
@@ -823,7 +823,7 @@ object BridgeFileTransferManager {
         val item = transfers.firstOrNull { it.id == id } ?: return
         val host = item.offerHost
             ?: ClipboardSyncManager.networkClient?.getCurrentHost()
-            ?: BridgePrefs.host(appCtx)
+            ?: LinkPrefs.host(appCtx)
             ?: return
         val port = item.offerPort
         val token = item.offerToken
@@ -852,7 +852,7 @@ object BridgeFileTransferManager {
                     }
                 }
 
-                if (BridgeFastLink.routeFor(appCtx, host) == BridgeFastLink.DataRoute.FAST_LINK) {
+                if (FastLink.routeFor(appCtx, host) == FastLink.DataRoute.FAST_LINK) {
                     item.statusNote = "Starting fast transfer…"
                     notifyUi()
                 }
@@ -860,7 +860,7 @@ object BridgeFileTransferManager {
                 dataHost = conn.acquiredHost
                 item.statusNote = null
                 if (!conn.viaBluetooth) {
-                    BridgeWifiLock.acquire(appCtx)
+                    LinkWifiLock.acquire(appCtx)
                     wifiLockHeld = true
                 }
                 val s = conn.socket
@@ -1004,7 +1004,7 @@ object BridgeFileTransferManager {
                 }
                 item.fileName = finalName
 
-                val customUriStr = BridgePrefs.getCustomSaveTreeUri(appCtx)
+                val customUriStr = LinkPrefs.getCustomSaveTreeUri(appCtx)
                 var finalFile: File? = null
                 var finalDocUri: Uri? = null
 
@@ -1060,7 +1060,7 @@ object BridgeFileTransferManager {
                 })
 
                 val locationName = if (finalDocUri != null) {
-                    BridgePrefs.getCustomSaveDisplayName(appCtx) ?: "Custom Folder"
+                    LinkPrefs.getCustomSaveDisplayName(appCtx) ?: "Custom Folder"
                 } else {
                     "Downloads"
                 }
@@ -1082,8 +1082,8 @@ object BridgeFileTransferManager {
                 dismissProgressNotification(context, item.id)
                 try { raf?.close() } catch (_: Exception) {}
                 try { sock?.close() } catch (_: Exception) {}
-                dataHost?.let { BridgeFastLink.releaseDataHost(it) }
-                if (wifiLockHeld) BridgeWifiLock.release()
+                dataHost?.let { FastLink.releaseDataHost(it) }
+                if (wifiLockHeld) LinkWifiLock.release()
                 activeSockets.remove(item.id)
             }
         }

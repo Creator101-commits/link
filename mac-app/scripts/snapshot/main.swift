@@ -1,27 +1,27 @@
 import AppKit
 import SwiftUI
 
-// Snapshot harness: renders BridgeMenuView offscreen-ish for design/screenshots.
-// Usage: BridgeSnapshot <screen> <light|dark> <out.png>
+// Snapshot harness: renders LinkMenuView offscreen-ish for design/screenshots.
+// Usage: LinkSnapshot <screen> <light|dark> <out.png>
 //   screen: not-paired | devices | notifications | transfers | settings
-// No networking, no Bluetooth, no Wi-Fi changes: BridgeModel(startServer: false).
+// No networking, no Bluetooth, no Wi-Fi changes: LinkModel(startServer: false).
 
 let args = CommandLine.arguments
 guard args.count >= 4 else {
-    FileHandle.standardError.write("usage: BridgeSnapshot <screen> <light|dark> <out.png>\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: LinkSnapshot <screen> <light|dark> <out.png>\n".data(using: .utf8)!)
     exit(2)
 }
 let screen = args[1]
 let mode = args[2]
 let outPath = args[3]
 
-let model = BridgeModel(startServer: false)
-let notifManager = BridgeNotificationManager.shared
-let fileManager = BridgeFileTransferManager.shared
+let model = LinkModel(startServer: false)
+let notifManager = LinkNotificationManager.shared
+let fileManager = LinkFileTransferManager.shared
 
 // Render the documented glass fallback so switches/icons/cards rasterize
 // identically under cacheDisplay (glassEffect does not rasterize offscreen).
-BridgeGlass.forceFallback = true
+LinkGlass.forceFallback = true
 
 // Deterministic paired state per screen.
 switch screen {
@@ -68,14 +68,14 @@ case "settings":
     notifManager.isMacAlertsForwardingEnabled = true
     notifManager.isSoundEnabled = true
     fileManager.autoAcceptIncomingFiles = true
-    BridgeFastLinkManager.shared.isFastLinkEnabled = true
+    FastLinkManager.shared.isFastLinkEnabled = true
     MainActor.assumeIsolated { injectPhaseAApps() }
 case "apps-settings":
     model.pairedDevice = "Pixel 8"
     model.connectedDevice = "Pixel 8"
     model.isConnected = true
     model.selectedTab = .settings
-    BridgeMenuView.snapshotAppsOnly = true
+    LinkMenuView.snapshotAppsOnly = true
     MainActor.assumeIsolated { injectPhaseAApps() }
 case "call-ringing":
     model.pairedDevice = "Pixel 8"
@@ -84,11 +84,11 @@ case "call-ringing":
     model.selectedTab = .devices
     MainActor.assumeIsolated {
         injectPhaseAApps()
-        BridgeDeviceStatus.shared.update(from: [
+        LinkDeviceStatus.shared.update(from: [
             "battery": 72, "charging": true, "plug": "usb",
             "network": "5G", "signal": 3, "carrier": "Jio", "name": "Pixel 8",
         ])
-        BridgeCallManager.shared.currentCall = BridgeCallManager.CallInfo(
+        LinkCallManager.shared.currentCall = LinkCallManager.CallInfo(
             state: .ringing, name: "Mom", number: "+91 98765 43210",
             direction: "incoming", startedAt: nil
         )
@@ -100,10 +100,10 @@ case "wifi-share":
     model.selectedTab = .devices
     MainActor.assumeIsolated {
         injectPhaseAState()
-        BridgeWifiShare.shared.freezeSSIDForSnapshots = true
-        BridgeWifiShare.shared.currentSSID = "HomeNetwork-5G"
-        BridgeWifiShare.shared.state = .sent(ssid: "HomeNetwork-5G")
-        BridgePhoneInternet.shared.state = .idle
+        LinkWifiShare.shared.freezeSSIDForSnapshots = true
+        LinkWifiShare.shared.currentSSID = "HomeNetwork-5G"
+        LinkWifiShare.shared.state = .sent(ssid: "HomeNetwork-5G")
+        LinkPhoneInternet.shared.state = .idle
     }
 case "phone-internet":
     model.pairedDevice = "Pixel 8"
@@ -112,10 +112,10 @@ case "phone-internet":
     model.selectedTab = .devices
     MainActor.assumeIsolated {
         injectPhaseAState()
-        BridgeWifiShare.shared.freezeSSIDForSnapshots = true
-        BridgeWifiShare.shared.currentSSID = "HomeNetwork-5G"
-        BridgePhoneInternet.shared.state = .connected(ssid: "Pixel 8 Hotspot")
-        BridgeWifiShare.shared.state = .idle
+        LinkWifiShare.shared.freezeSSIDForSnapshots = true
+        LinkWifiShare.shared.currentSSID = "HomeNetwork-5G"
+        LinkPhoneInternet.shared.state = .connected(ssid: "Pixel 8 Hotspot")
+        LinkWifiShare.shared.state = .idle
     }
 default:
     FileHandle.standardError.write("unknown screen: \(screen)\n".data(using: .utf8)!)
@@ -147,7 +147,7 @@ func sampleIcon(_ letter: String, _ rgb: (CGFloat, CGFloat, CGFloat)) -> String 
 }
 
 func injectSampleNotifications() {
-    let cache = BridgeAppIconCache.shared
+    let cache = LinkAppIconCache.shared
     let icons: [(String, String, String, (CGFloat, CGFloat, CGFloat))] = [
         ("com.whatsapp", "WhatsApp", "W", (0.18, 0.72, 0.29)),
         ("com.instagram.android", "Instagram", "I", (0.55, 0.25, 0.75)),
@@ -160,38 +160,38 @@ func injectSampleNotifications() {
     let now = Int64(Date().timeIntervalSince1970 * 1000)
     notifManager.activeNotifications = [
         // WhatsApp x3 (newest first) — one carries a reply action.
-        BridgeNotification(
+        LinkNotification(
             id: "snap-wa-1", source: "android", pkg: "com.whatsapp", app: "WhatsApp",
             title: "Family Group", text: "Dad: Call me when free",
             timestamp: now - 30_000,
             actions: [
-                BridgeNotificationAction(id: 0, title: "Reply", hasInput: true, placeholder: "Reply"),
-                BridgeNotificationAction(id: 1, title: "Mark as read"),
+                LinkNotificationAction(id: 0, title: "Reply", hasInput: true, placeholder: "Reply"),
+                LinkNotificationAction(id: 1, title: "Mark as read"),
             ]
         ),
-        BridgeNotification(
+        LinkNotification(
             id: "snap-wa-2", source: "android", pkg: "com.whatsapp", app: "WhatsApp",
             title: "Mom", text: "On my way",
             timestamp: now - 4 * 60_000
         ),
-        BridgeNotification(
+        LinkNotification(
             id: "snap-wa-3", source: "android", pkg: "com.whatsapp", app: "WhatsApp",
             title: "Weekend Plans", text: "Sarah: Saturday works for me",
             timestamp: now - 9 * 60_000
         ),
         // Instagram x1
-        BridgeNotification(
+        LinkNotification(
             id: "snap-ig-1", source: "android", pkg: "com.instagram.android", app: "Instagram",
             title: "alex.k", text: "Liked your photo: \"Sunset hike\"",
             timestamp: now - 12 * 60_000
         ),
         // Gmail x2
-        BridgeNotification(
+        LinkNotification(
             id: "snap-gm-1", source: "android", pkg: "com.google.android.gm", app: "Gmail",
             title: "GitHub", text: "[bridgeoffline] PR #42 merged",
             timestamp: now - 20 * 60_000
         ),
-        BridgeNotification(
+        LinkNotification(
             id: "snap-gm-2", source: "android", pkg: "com.google.android.gm", app: "Gmail",
             title: "Receipts", text: "Your order has shipped",
             timestamp: now - 50 * 60_000
@@ -202,7 +202,7 @@ func injectSampleNotifications() {
 /// Shared Phase-A sample state: phone status, app rules, display names.
 @MainActor
 func injectPhaseAState() {
-    BridgeDeviceStatus.shared.update(from: [
+    LinkDeviceStatus.shared.update(from: [
         "battery": 72, "charging": true, "plug": "usb",
         "network": "5G", "signal": 3, "carrier": "Jio", "name": "Pixel 8",
     ])
@@ -253,7 +253,7 @@ func injectSampleTransfers() {
 // MARK: - Render window
 
 let appearance: NSAppearance.Name = (mode == "dark") ? .darkAqua : .aqua
-let hosting = NSHostingController(rootView: BridgeMenuView(model: model))
+let hosting = NSHostingController(rootView: LinkMenuView(model: model))
 if #available(macOS 13.0, *) {
     hosting.sizingOptions = [.preferredContentSize]
 }

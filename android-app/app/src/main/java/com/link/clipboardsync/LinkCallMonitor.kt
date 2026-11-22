@@ -32,9 +32,9 @@ import java.util.concurrent.Executors
  * Requires READ_PHONE_STATE for call state; READ_CALL_LOG for the incoming
  * number; READ_CONTACTS for the caller name; ANSWER_PHONE_CALLS for actions.
  */
-object BridgeCallMonitor {
+object LinkCallMonitor {
 
-    private const val TAG = "BridgeCallMonitor"
+    private const val TAG = "LinkCallMonitor"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val lookupExecutor = Executors.newSingleThreadExecutor()

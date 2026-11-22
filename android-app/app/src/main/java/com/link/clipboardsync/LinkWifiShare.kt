@@ -19,7 +19,7 @@ import org.json.JSONObject
  * via the best available API and replies {"type":"wifi_share_ack",...}.
  * Pure validation lives in [WifiShareRequest.fromJson] (unit-tested).
  */
-object BridgeWifiShare {
+object LinkWifiShare {
     private const val CHANNEL_ID = "wifi_sharing"
     private const val CHANNEL_NAME = "Wi-Fi sharing"
 

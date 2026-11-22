@@ -4,9 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAC_APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-APP_PATH="${1:-${MAC_APP_DIR}/Bridge.app}"
-OUT_DMG="${2:-${MAC_APP_DIR}/Bridge-macOS.dmg}"
-VOLUME_NAME="Bridge"
+APP_PATH="${1:-${MAC_APP_DIR}/Link.app}"
+OUT_DMG="${2:-${MAC_APP_DIR}/Link-macOS.dmg}"
+VOLUME_NAME="Link"
 BG_SRC="${MAC_APP_DIR}/Resources/dmg/dmg-background.tiff"
 FALLBACK_DS_STORE="${MAC_APP_DIR}/Resources/dmg/DS_Store"
 
@@ -22,7 +22,7 @@ fi
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/bridge-dmg.XXXXXX")"
 STAGE_DIR="${WORK_DIR}/stage"
-RW_DMG="${WORK_DIR}/Bridge-rw.dmg"
+RW_DMG="${WORK_DIR}/Link-rw.dmg"
 ATTACHED_DEVICE=""
 
 cleanup() {
@@ -35,7 +35,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "${STAGE_DIR}/.background"
-ditto "${APP_PATH}" "${STAGE_DIR}/Bridge.app"
+ditto "${APP_PATH}" "${STAGE_DIR}/Link.app"
 ln -s /Applications "${STAGE_DIR}/Applications"
 cp "${BG_SRC}" "${STAGE_DIR}/.background/dmg-bg.tiff"
 
@@ -88,7 +88,7 @@ tell application "Finder"
     set icon size of viewOptions to 120
     set text size of viewOptions to 13
     set background picture of viewOptions to file ".background:dmg-bg.tiff"
-    set position of item "Bridge.app" of container window to {{170, 185}}
+    set position of item "Link.app" of container window to {{170, 185}}
     set position of item "Applications" of container window to {{470, 185}}
     close
     open

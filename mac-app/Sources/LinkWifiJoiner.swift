@@ -2,10 +2,10 @@ import Foundation
 import CoreWLAN
 
 /// Shared CoreWLAN join/restore for joining a phone hotspot and returning to
-/// the previous network. Reuses BridgeFastLinkManager's static helpers so the
+/// the previous network. Reuses FastLinkManager's static helpers so the
 /// fast-link path stays untouched. Runs its blocking scan/associate loops off
 /// the main thread (call from a background queue).
-enum BridgeWifiJoiner {
+enum LinkWifiJoiner {
     private static let wifiClient = CWWiFiClient.shared()
 
     enum JoinError: Error {
@@ -45,7 +45,7 @@ enum BridgeWifiJoiner {
                     emptyScans += 1
                     if emptyScans >= 3 && !triedNetworkSetup {
                         triedNetworkSetup = true
-                        joined = BridgeFastLinkManager.joinViaNetworkSetup(
+                        joined = FastLinkManager.joinViaNetworkSetup(
                             interfaceName: interfaceName, ssid: ssid, psk: psk)
                     }
                     usleep(250_000)
@@ -56,7 +56,7 @@ enum BridgeWifiJoiner {
         // Wait briefly for an IP so the caller knows the link is usable.
         let ipDeadline = Date().addingTimeInterval(10)
         while Date() < ipDeadline {
-            if BridgeFastLinkManager.usableIPv4(onInterface: interfaceName) != nil { return }
+            if FastLinkManager.usableIPv4(onInterface: interfaceName) != nil { return }
             usleep(50_000)
         }
         throw JoinError.noIP
@@ -69,7 +69,7 @@ enum BridgeWifiJoiner {
     static func restore(previousSSID: String?, wasOnWifi: Bool) {
         let iface = wifiClient.interface()
         let effectivePrev = (previousSSID != nil && previousSSID == iface?.ssid()) ? nil : previousSSID
-        let plan = BridgeFastLinkManager.restorePlan(previousSSID: effectivePrev, wasOnWifi: wasOnWifi)
+        let plan = FastLinkManager.restorePlan(previousSSID: effectivePrev, wasOnWifi: wasOnWifi)
         iface?.disassociate()
         switch plan {
         case .rejoin(let ssid):

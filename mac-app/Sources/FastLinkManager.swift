@@ -22,8 +22,8 @@ import Darwin
  * All Wi-Fi work runs on the serial fastLinkQueue (CoreWLAN calls block).
  * The passphrase is never logged.
  */
-final class BridgeFastLinkManager: ObservableObject {
-    static let shared = BridgeFastLinkManager()
+final class FastLinkManager: ObservableObject {
+    static let shared = FastLinkManager()
 
     private static let enabledKey = "bridgeFastLinkEnabled"
 
@@ -119,10 +119,10 @@ final class BridgeFastLinkManager: ObservableObject {
     /// Sends the pre-warm hint so the phone can start its hotspot early.
     func sendPrewarmRequest(toDeviceId: UUID) {
         guard isFastLinkEnabled else { return }
-        BridgeFileTransferManager.shared.sendControlMessage?("{\"type\":\"fastlink_request\"}", toDeviceId)
+        LinkFileTransferManager.shared.sendControlMessage?("{\"type\":\"fastlink_request\"}", toDeviceId)
     }
 
-    /// Called by BridgeServer when an authenticated control connection drops.
+    /// Called by LinkServer when an authenticated control connection drops.
     func controlConnectionClosed(deviceId: UUID) {
         fastLinkQueue.async { [weak self] in
             guard let self = self, self.ownerDeviceId == deviceId, self.state != .idle else { return }
@@ -175,7 +175,7 @@ final class BridgeFastLinkManager: ObservableObject {
         }
         // Don't hijack Wi-Fi while the phone's hotspot is being used for
         // internet — Android falls back on a failed reply.
-        if BridgePhoneInternet.isConnectedFlag {
+        if LinkPhoneInternet.isConnectedFlag {
             replyFailed(deviceId: deviceId, session: offer.session, reason: "phone_internet_active")
             return
         }
@@ -384,8 +384,8 @@ final class BridgeFastLinkManager: ObservableObject {
     private func watchdogTick() {
         guard state == .ready, let joined = joinedAt else { return }
         if Date().timeIntervalSince(joined) >= 600,
-           !BridgeFileTransferManager.shared.hasActiveSessions() {
-            NSLog("[BridgeFastLink] Watchdog: no fastlink_end and no active transfers; restoring Wi-Fi")
+           !LinkFileTransferManager.shared.hasActiveSessions() {
+            NSLog("[FastLink] Watchdog: no fastlink_end and no active transfers; restoring Wi-Fi")
             restore()
             return
         }
@@ -415,7 +415,7 @@ final class BridgeFastLinkManager: ObservableObject {
     private func sendFastLinkReply(deviceId: UUID, fields: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: fields),
               let json = String(data: data, encoding: .utf8) else { return }
-        BridgeFileTransferManager.shared.sendControlMessage?(json, deviceId)
+        LinkFileTransferManager.shared.sendControlMessage?(json, deviceId)
     }
 
     private func setStatus(_ text: String?) {

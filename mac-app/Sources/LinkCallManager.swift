@@ -6,8 +6,8 @@ import UserNotifications
 /// above the tab strip while a call is ringing/active.
 /// Call audio stays on the phone — this is display + remote control only.
 @MainActor
-final class BridgeCallManager: ObservableObject {
-    static let shared = BridgeCallManager()
+final class LinkCallManager: ObservableObject {
+    static let shared = LinkCallManager()
 
     enum CallState: String { case ringing, active, ended }
 
@@ -22,12 +22,12 @@ final class BridgeCallManager: ObservableObject {
     @Published var currentCall: CallInfo?
 
     private var endDismissWorkItem: DispatchWorkItem?
-    /// Set by BridgeModel to the server's broadcastRawJson (String-based).
+    /// Set by LinkModel to the server's broadcastRawJson (String-based).
     var sendJsonHandler: ((String) -> Void)?
 
     private init() {}
 
-    // MARK: - Routing (called from BridgeServer for "call_" types)
+    // MARK: - Routing (called from LinkServer for "call_" types)
 
     func handleIncoming(json: [String: Any], from deviceId: String) {
         guard let type = json["type"] as? String else { return }
@@ -108,7 +108,7 @@ final class BridgeCallManager: ObservableObject {
 
 }
 
-extension BridgeCallManager {
+extension LinkCallManager {
     /// Elapsed seconds for the active call (computed in the view's TimelineView).
     static func elapsedSeconds(since startedAt: Date?) -> Int {
         guard let start = startedAt else { return 0 }

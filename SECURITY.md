@@ -12,7 +12,7 @@
 
 ## Security Model & Current Architecture
 
-**Bridge** operates on a **100% local, zero-cloud model**: all device communication stays on your local Wi-Fi or personal hotspot with no external servers or telemetry (aside from optional GitHub Releases update checks).
+**Link** operates on a **100% local, zero-cloud model**: all device communication stays on your local Wi-Fi or personal hotspot with no external servers or telemetry.
 
 ### 1. 2048-Bit SPEKE Password-Authenticated Key Exchange (PAKE)
 - Pairing authentication uses **SPEKE (Simple Password Exponential Key Exchange)** over the **RFC 3526 Group 14 (2048-bit MODP)** safe prime $p = 2q + 1$:
@@ -21,14 +21,14 @@
   - Public group elements are validated in $[2, p - 2]$ to reject small-subgroup and trivial-element attacks, and mutual transcript key-confirmation proofs (`auth` and `welcome`) are verified in constant time before any session data is accepted.
 
 ### 2. End-to-End AES-256-GCM Session Encryption (`TCP :8765`)
-- Upon completing the SPEKE handshake, Bridge derives independent 256-bit directional keys (`c2sKey` for Android $\to$ Mac and `s2cKey` for Mac $\to$ Android).
+- Upon completing the SPEKE handshake, Link derives independent 256-bit directional keys (`c2sKey` for Android $\to$ Mac and `s2cKey` for Mac $\to$ Android).
 - Every post-handshake message on `TCP :8765` (clipboard text, clipboard images, mirrored notifications, inline replies, settings sync, and file-transfer control headers) is encapsulated in an authenticated **AES-256-GCM** frame (`{"type":"enc","seq":<u64>,"d":"<base64(iv + ciphertext + tag)>"}`):
   - **96-bit IV:** 4-byte CSPRNG salt + 8-byte big-endian monotonic sequence number (`seq`).
   - **AAD:** Binds both direction and sequence number (`"bridge-v1:<direction>:<seq>"`) with a 128-bit authentication tag, preventing tampering, direction reflection, out-of-order injection, and replay.
   - Any unencrypted post-handshake packet is rejected immediately and terminates the connection.
 
 ### 3. Local Network Boundary Enforcement
-- Bridge accepts connections **only from private/local network ranges** (RFC 1918: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, link-local `169.254.0.0/16`, CGNAT `100.64.0.0/10`, loopback, and IPv6 `fe80:`/`fc`/`fd`).
+- Link accepts connections **only from private/local network ranges** (RFC 1918: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, link-local `169.254.0.0/16`, CGNAT `100.64.0.0/10`, loopback, and IPv6 `fe80:`/`fc`/`fd`).
 - Any connection attempt originating from a public WAN IP address is rejected.
 - Pairing codes on macOS are stored with POSIX `0600` permissions (`~/.bridge_pairing_code`).
 
@@ -56,7 +56,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability or weakness in Bridge, please **do not open a public issue**. Instead, report it responsibly:
+If you discover a security vulnerability or weakness in Link, please **do not open a public issue**. Instead, report it responsibly:
 
 1. Submit a private report via GitHub's [**Private Vulnerability Reporting**](../../security/advisories/new) tab.
 2. Include a description of the vulnerability, affected version(s), attack surface (`Android`, `macOS`, or `Wire Protocol`), and reproducible steps.

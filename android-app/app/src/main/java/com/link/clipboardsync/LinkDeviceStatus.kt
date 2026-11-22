@@ -44,10 +44,10 @@ fun networkLabel(dataNetworkType: Int, overrideNetworkType: Int): String {
  * that only changed fields are sent. Signal-only changes are debounced to
  * at most one send per 10 s.
  */
-object BridgeDeviceStatus {
+object LinkDeviceStatus {
 
     private const val SIGNAL_DEBOUNCE_MS = 10_000L
-    private const val TAG = "BridgeDeviceStatus"
+    private const val TAG = "LinkDeviceStatus"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val telephonyExecutor = Executors.newSingleThreadExecutor()

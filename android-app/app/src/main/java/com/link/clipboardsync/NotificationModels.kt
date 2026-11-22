@@ -3,7 +3,7 @@ package com.link.clipboardsync
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class BridgeNotificationAction(
+data class LinkNotificationAction(
     val id: Int,
     val title: String,
     val hasInput: Boolean = false,
@@ -19,8 +19,8 @@ data class BridgeNotificationAction(
     }
 
     companion object {
-        fun fromJson(json: JSONObject): BridgeNotificationAction {
-            return BridgeNotificationAction(
+        fun fromJson(json: JSONObject): LinkNotificationAction {
+            return LinkNotificationAction(
                 id = json.optInt("id", 0),
                 title = json.optString("title", ""),
                 hasInput = json.optBoolean("hasInput", false),
@@ -30,7 +30,7 @@ data class BridgeNotificationAction(
     }
 }
 
-data class BridgeMessageItem(
+data class LinkMessageItem(
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
     val sender: String? = null
@@ -44,8 +44,8 @@ data class BridgeMessageItem(
     }
 
     companion object {
-        fun fromJson(json: JSONObject): BridgeMessageItem {
-            return BridgeMessageItem(
+        fun fromJson(json: JSONObject): LinkMessageItem {
+            return LinkMessageItem(
                 text = json.optString("text", ""),
                 timestamp = json.optLong("timestamp", System.currentTimeMillis()),
                 sender = json.optString("sender").ifEmpty { null }
@@ -54,7 +54,7 @@ data class BridgeMessageItem(
     }
 }
 
-data class BridgeNotification(
+data class LinkNotification(
     val id: String,
     val source: String = "android", // "android" or "mac"
     val pkg: String = "",
@@ -63,9 +63,9 @@ data class BridgeNotification(
     val text: String = "",
     val icon: String? = null, // Base64 encoded PNG
     val timestamp: Long = System.currentTimeMillis(),
-    val actions: List<BridgeNotificationAction> = emptyList(),
+    val actions: List<LinkNotificationAction> = emptyList(),
     val isSilent: Boolean = false,
-    val messages: List<BridgeMessageItem>? = null,
+    val messages: List<LinkMessageItem>? = null,
     val isNewestFirst: Boolean? = null
 ) {
     fun toPostJsonString(): String {
@@ -98,27 +98,27 @@ data class BridgeNotification(
     }
 
     companion object {
-        fun fromJson(json: JSONObject): BridgeNotification? {
+        fun fromJson(json: JSONObject): LinkNotification? {
             val id = json.optString("id").ifEmpty { return null }
-            val actionsList = ArrayList<BridgeNotificationAction>()
+            val actionsList = ArrayList<LinkNotificationAction>()
             val arr = json.optJSONArray("actions")
             if (arr != null) {
                 for (i in 0 until arr.length()) {
                     val aObj = arr.optJSONObject(i) ?: continue
-                    actionsList.add(BridgeNotificationAction.fromJson(aObj))
+                    actionsList.add(LinkNotificationAction.fromJson(aObj))
                 }
             }
 
-            val messagesList = ArrayList<BridgeMessageItem>()
+            val messagesList = ArrayList<LinkMessageItem>()
             val msgArr = json.optJSONArray("messages")
             if (msgArr != null) {
                 for (i in 0 until msgArr.length()) {
                     val mObj = msgArr.optJSONObject(i) ?: continue
-                    messagesList.add(BridgeMessageItem.fromJson(mObj))
+                    messagesList.add(LinkMessageItem.fromJson(mObj))
                 }
             }
 
-            return BridgeNotification(
+            return LinkNotification(
                 id = id,
                 source = json.optString("source", "android"),
                 pkg = json.optString("pkg", ""),

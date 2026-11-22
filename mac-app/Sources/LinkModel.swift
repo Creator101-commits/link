@@ -4,7 +4,7 @@ import SwiftUI
 import Combine
 import CoreImage.CIFilterBuiltins
 
-class BridgeModel: ObservableObject {
+class LinkModel: ObservableObject {
     @Published var rawCode: String = ""
     @Published var formattedCode: String = ""
     @Published var localIp: String = "127.0.0.1"
@@ -29,13 +29,13 @@ class BridgeModel: ObservableObject {
     @Published var deviceToUnpair: ConnectedDeviceInfo? = nil
     @Published var revealedDeviceIpIds: Set<UUID> = []
     @Published var isLocalIpRevealed: Bool = false
-    enum BridgeTab: String, CaseIterable {
+    enum LinkTab: String, CaseIterable {
         case devices = "Devices"
         case notifications = "Notifications"
         case files = "Transfer"
         case settings = "Settings"
     }
-    @Published var selectedTab: BridgeTab = .devices {
+    @Published var selectedTab: LinkTab = .devices {
         didSet {
             if selectedTab != .devices && showPairingSection {
                 showPairingSection = false
@@ -43,11 +43,11 @@ class BridgeModel: ObservableObject {
             onSizeChangeRequested?()
         }
     }
-    var notificationsManager: BridgeNotificationManager {
-        return BridgeNotificationManager.shared
+    var notificationsManager: LinkNotificationManager {
+        return LinkNotificationManager.shared
     }
-    var fileTransferManager: BridgeFileTransferManager {
-        return BridgeFileTransferManager.shared
+    var fileTransferManager: LinkFileTransferManager {
+        return LinkFileTransferManager.shared
     }
 
     @Published var showPairingSection: Bool = false {
@@ -63,7 +63,7 @@ class BridgeModel: ObservableObject {
 
     var onSizeChangeRequested: (() -> Void)?
     
-    let server = BridgeServer()
+    let server = LinkServer()
     private var cancellables = Set<AnyCancellable>()
 
     private static let keyPairedDevice = "bridge_paired_device_name"
@@ -79,24 +79,24 @@ class BridgeModel: ObservableObject {
         self.deviceName = Host.current().localizedName ?? "Mac"
         self.port = Int(server.port.rawValue)
         self.localIp = getPrimaryIPv4Address() ?? "127.0.0.1"
-        self.pairedDevice = UserDefaults.standard.string(forKey: BridgeModel.keyPairedDevice)
+        self.pairedDevice = UserDefaults.standard.string(forKey: LinkModel.keyPairedDevice)
         
         updateQrCode()
         setupServerCallbacks()
         if startServer {
             server.start()
-            BridgeBluetoothRelay.shared.start()
-            BridgeFastLinkManager.shared.requestLocationAuthorizationIfNeeded()
+            LinkBluetoothRelay.shared.start()
+            FastLinkManager.shared.requestLocationAuthorizationIfNeeded()
         }
 
-        BridgeNotificationManager.shared.$activeNotifications
+        LinkNotificationManager.shared.$activeNotifications
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.onSizeChangeRequested?()
             }
             .store(in: &cancellables)
 
-        BridgeFileTransferManager.shared.$transfers
+        LinkFileTransferManager.shared.$transfers
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.onSizeChangeRequested?()
@@ -108,13 +108,13 @@ class BridgeModel: ObservableObject {
         // Assigned once: the observer reads current connection state lazily.
         AXNotificationObserver.shared.shouldScan = { [weak self] in self?.isConnected == true }
         Task { @MainActor in
-            BridgeCallManager.shared.sendJsonHandler = { [weak self] json in
+            LinkCallManager.shared.sendJsonHandler = { [weak self] json in
                 self?.server.broadcastRawJson(json)
             }
-            BridgeWifiShare.shared.sendJsonHandler = { [weak self] json in
+            LinkWifiShare.shared.sendJsonHandler = { [weak self] json in
                 self?.server.broadcastRawJson(json)
             }
-            BridgePhoneInternet.shared.sendJsonHandler = { [weak self] json in
+            LinkPhoneInternet.shared.sendJsonHandler = { [weak self] json in
                 self?.server.broadcastRawJson(json)
             }
         }
@@ -126,13 +126,13 @@ class BridgeModel: ObservableObject {
                 if connected {
                     if let dev = device, !dev.isEmpty {
                         self.pairedDevice = dev
-                        UserDefaults.standard.set(dev, forKey: BridgeModel.keyPairedDevice)
+                        UserDefaults.standard.set(dev, forKey: LinkModel.keyPairedDevice)
                     }
                     self.showPairingSection = false
                 } else {
                     // Last client gone — drop phone status + any live call card.
-                    BridgeDeviceStatus.shared.clear()
-                    BridgeCallManager.shared.currentCall = nil
+                    LinkDeviceStatus.shared.clear()
+                    LinkCallManager.shared.currentCall = nil
                 }
                 self.onSizeChangeRequested?()
             }
@@ -145,7 +145,7 @@ class BridgeModel: ObservableObject {
                 if let first = devices.first {
                     self.connectedDevice = first.name
                     self.pairedDevice = first.name
-                    UserDefaults.standard.set(first.name, forKey: BridgeModel.keyPairedDevice)
+                    UserDefaults.standard.set(first.name, forKey: LinkModel.keyPairedDevice)
                     if self.selectedTargetDeviceId == nil || !devices.contains(where: { $0.id == self.selectedTargetDeviceId }) {
                         self.selectedTargetDeviceId = first.id
                     }
@@ -179,7 +179,7 @@ class BridgeModel: ObservableObject {
             } else if let first = self.connectedDevicesList.first {
                 self.pairedDevice = first.name
                 self.connectedDevice = first.name
-                UserDefaults.standard.set(first.name, forKey: BridgeModel.keyPairedDevice)
+                UserDefaults.standard.set(first.name, forKey: LinkModel.keyPairedDevice)
                 if self.selectedTargetDeviceId == deviceId || self.selectedTargetDeviceId == nil {
                     self.selectedTargetDeviceId = first.id
                 }
@@ -210,7 +210,7 @@ class BridgeModel: ObservableObject {
             "port": port,
             "code": rawCode,
             "name": deviceName,
-            "bt": BridgeBluetoothRelay.bluetoothId
+            "bt": LinkBluetoothRelay.bluetoothId
         ]
         
         guard let jsonData = try? JSONSerialization.data(withJSONObject: jsonDict),
@@ -264,8 +264,8 @@ class BridgeModel: ObservableObject {
         isConnected = false
         connectedDevice = nil
         hideAllIpAddresses()
-        UserDefaults.standard.removeObject(forKey: BridgeModel.keyPairedDevice)
-        BridgeNotificationManager.shared.clearLocalNotificationsOnly()
+        UserDefaults.standard.removeObject(forKey: LinkModel.keyPairedDevice)
+        LinkNotificationManager.shared.clearLocalNotificationsOnly()
         refreshPairingCodeFromServer()
         onSizeChangeRequested?()
     }
@@ -282,7 +282,7 @@ class BridgeModel: ObservableObject {
                 } else if let first = self.connectedDevicesList.first {
                     self.pairedDevice = first.name
                     self.connectedDevice = first.name
-                    UserDefaults.standard.set(first.name, forKey: BridgeModel.keyPairedDevice)
+                    UserDefaults.standard.set(first.name, forKey: LinkModel.keyPairedDevice)
                     if self.selectedTargetDeviceId == id || self.selectedTargetDeviceId == nil {
                         self.selectedTargetDeviceId = first.id
                     }
@@ -316,7 +316,7 @@ class BridgeModel: ObservableObject {
         let target = connectedDevicesList.first(where: { $0.id == selectedTargetDeviceId })
             ?? connectedDevicesList.first
         guard let target = target, target.ip == "Bluetooth" else { return }
-        BridgeFastLinkManager.shared.sendPrewarmRequest(toDeviceId: target.id)
+        FastLinkManager.shared.sendPrewarmRequest(toDeviceId: target.id)
     }
 
     func sendFiles(_ urls: [URL]) {
@@ -325,9 +325,9 @@ class BridgeModel: ObservableObject {
             ?? connectedDevicesList.first
             ?? ConnectedDeviceInfo(id: UUID(), name: connectedDevice ?? pairedDevice ?? "Android", ip: nil, isConnected: isConnected)
         if targetDev.ip == "Bluetooth" {
-            BridgeFastLinkManager.shared.sendPrewarmRequest(toDeviceId: targetDev.id)
+            FastLinkManager.shared.sendPrewarmRequest(toDeviceId: targetDev.id)
         }
-        BridgeFileTransferManager.shared.sendFiles(urls: urls, to: targetDev)
+        LinkFileTransferManager.shared.sendFiles(urls: urls, to: targetDev)
     }
 
     func selectFilesToSend() {

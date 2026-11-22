@@ -4,15 +4,15 @@ import Network
 
 // MARK: - Bluetooth LE L2CAP Loopback Relay
 //
-// Exposes the Mac's Bridge TCP service over Bluetooth LE so an Android phone
+// Exposes the Mac's Link TCP service over Bluetooth LE so an Android phone
 // can pair and transfer files with no Wi-Fi or internet. Each accepted L2CAP
 // channel starts with a one-line JSON header {"relay":<port>} and is then
 // piped byte-for-byte to 127.0.0.1:<port>, leaving the existing
 // line-delimited JSON protocol (SPEKE + AES-256-GCM) untouched. Only the
-// Bridge control port and active file-transfer data ports may be relayed.
+// Link control port and active file-transfer data ports may be relayed.
 
-final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
-    static let shared = BridgeBluetoothRelay()
+final class LinkBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
+    static let shared = LinkBluetoothRelay()
 
     // Shared with the Android client; keep in sync.
     static let serviceUUID = "6B3F0E2A-6C1D-4E0B-9A57-2F1B8D5C0A01"
@@ -230,7 +230,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didPublishL2CAPChannel psm: CBL2CAPPSM, error: Error?) {
         if let error = error {
-            NSLog("[BridgeBluetooth] Failed to publish L2CAP channel: %@", "\(error)")
+            NSLog("[LinkBluetooth] Failed to publish L2CAP channel: %@", "\(error)")
             publishedPSM = nil
             return
         }
@@ -241,7 +241,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didOpen channel: CBL2CAPChannel?, error: Error?) {
         if let error = error {
-            NSLog("[BridgeBluetooth] L2CAP channel open failed: %@", "\(error)")
+            NSLog("[LinkBluetooth] L2CAP channel open failed: %@", "\(error)")
             return
         }
         guard let channel = channel else { return }
@@ -250,7 +250,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
         let atCapacity = sessions.count >= Self.maxRelaySessions
         sessionsLock.unlock()
         guard !atCapacity else {
-            NSLog("[BridgeBluetooth] L2CAP relay session limit reached; rejecting channel")
+            NSLog("[LinkBluetooth] L2CAP relay session limit reached; rejecting channel")
             channel.inputStream?.close()
             channel.outputStream?.close()
             return
@@ -290,7 +290,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
         if let error = error {
-            NSLog("[BridgeBluetooth] Failed to add GATT service: %@", "\(error)")
+            NSLog("[LinkBluetooth] Failed to add GATT service: %@", "\(error)")
             gattServiceAddAttempted = false
         }
         notifyStateChanged()
@@ -298,7 +298,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
 
     func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
         if let error = error {
-            NSLog("[BridgeBluetooth] Failed to start advertising: %@", "\(error)")
+            NSLog("[LinkBluetooth] Failed to start advertising: %@", "\(error)")
             advertisingRequested = false
             isAdvertising = false
         } else {
@@ -357,7 +357,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
         advertisingRequested = true
         peripheral.startAdvertising([
             CBAdvertisementDataServiceUUIDsKey: [CBUUID(string: Self.serviceUUID)],
-            CBAdvertisementDataLocalNameKey: "Bridge"
+            CBAdvertisementDataLocalNameKey: "Link"
         ])
     }
 
@@ -424,7 +424,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
             case piping
         }
 
-        private weak var owner: BridgeBluetoothRelay?
+        private weak var owner: LinkBluetoothRelay?
         private let channel: CBL2CAPChannel
 
         private var phase: Phase = .awaitingHeader
@@ -441,7 +441,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
         private let localPortLock = NSLock()
         private var storedLocalPort: UInt16?
 
-        init(channel: CBL2CAPChannel, owner: BridgeBluetoothRelay) {
+        init(channel: CBL2CAPChannel, owner: LinkBluetoothRelay) {
             self.channel = channel
             self.owner = owner
         }
@@ -522,7 +522,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
                 flushOutbound()
             } else if event == .endEncountered || event == .errorOccurred {
                 if let error = aStream.streamError {
-                    NSLog("[BridgeBluetooth] Relay stream error: %@", "\(error)")
+                    NSLog("[LinkBluetooth] Relay stream error: %@", "\(error)")
                 }
                 close()
             }
@@ -546,11 +546,11 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
             switch phase {
             case .awaitingHeader:
                 headerBuffer.append(data)
-                if let parsed = BridgeBluetoothRelay.parseRelayHeader(headerBuffer) {
+                if let parsed = LinkBluetoothRelay.parseRelayHeader(headerBuffer) {
                     openTcpConnection(port: parsed.port, headerLength: parsed.headerLength)
                 } else if headerBuffer.contains(UInt8(ascii: "\n"))
-                            || headerBuffer.count > BridgeBluetoothRelay.maxHeaderBytes {
-                    NSLog("[BridgeBluetooth] Rejecting malformed relay header")
+                            || headerBuffer.count > LinkBluetoothRelay.maxHeaderBytes {
+                    NSLog("[LinkBluetooth] Rejecting malformed relay header")
                     close()
                 }
             case .piping:
@@ -560,13 +560,13 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
         }
 
         private static func isAllowedRelayPort(_ port: UInt16) -> Bool {
-            if port == BridgeBluetoothRelay.bridgeControlPort { return true }
-            return BridgeFileTransferManager.shared.isActiveDataPort(port)
+            if port == LinkBluetoothRelay.bridgeControlPort { return true }
+            return LinkFileTransferManager.shared.isActiveDataPort(port)
         }
 
         private func openTcpConnection(port: UInt16, headerLength: Int) {
             guard Self.isAllowedRelayPort(port) else {
-                NSLog("[BridgeBluetooth] Rejecting relay request for port %d", port)
+                NSLog("[LinkBluetooth] Rejecting relay request for port %d", port)
                 close()
                 return
             }
@@ -617,7 +617,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
         }
 
         /// Records the ephemeral local port of the outgoing loopback connection
-        /// so BridgeServer can recognize relayed sessions. Runs on relayNetQueue.
+        /// so LinkServer can recognize relayed sessions. Runs on relayNetQueue.
         private func noteLocalPort(of connection: NWConnection) {
             guard let endpoint = connection.currentPath?.localEndpoint,
                   case .hostPort(_, let port) = endpoint else { return }
@@ -633,8 +633,8 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
                 sendToTcp(data)
             } else {
                 pendingToTcp.append(data)
-                if pendingToTcp.count > BridgeBluetoothRelay.maxPendingToTcpBytes {
-                    NSLog("[BridgeBluetooth] Relay pending buffer overflow; closing")
+                if pendingToTcp.count > LinkBluetoothRelay.maxPendingToTcpBytes {
+                    NSLog("[LinkBluetooth] Relay pending buffer overflow; closing")
                     close()
                 }
             }
@@ -651,7 +651,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
             guard let conn = conn else { return }
             conn.send(content: data, completion: .contentProcessed { [weak self] error in
                 guard let self = self, let error = error else { return }
-                NSLog("[BridgeBluetooth] Relay TCP send failed: %@", "\(error)")
+                NSLog("[LinkBluetooth] Relay TCP send failed: %@", "\(error)")
                 self.performOnRelayRunLoop { self.close() }
             })
         }
@@ -659,7 +659,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
         private func startTcpReceiveLoop() {
             guard !closed, !receiveInFlight, let conn = conn else { return }
             receiveInFlight = true
-            conn.receive(minimumIncompleteLength: 1, maximumLength: BridgeBluetoothRelay.tcpReceiveChunkSize) { [weak self] data, _, isComplete, error in
+            conn.receive(minimumIncompleteLength: 1, maximumLength: LinkBluetoothRelay.tcpReceiveChunkSize) { [weak self] data, _, isComplete, error in
                 guard let self = self else { return }
                 self.performOnRelayRunLoop {
                     guard !self.closed else { return }
@@ -669,7 +669,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
                     }
                     if isComplete || error != nil {
                         if let error = error {
-                            NSLog("[BridgeBluetooth] Relay TCP receive failed: %@", "\(error)")
+                            NSLog("[LinkBluetooth] Relay TCP receive failed: %@", "\(error)")
                         }
                         self.close()
                         return
@@ -693,7 +693,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
                     pendingOutbound.removeSubrange(0..<written)
                 }
             }
-            if pendingOutbound.count < BridgeBluetoothRelay.outboundHighWaterMark {
+            if pendingOutbound.count < LinkBluetoothRelay.outboundHighWaterMark {
                 startTcpReceiveLoop()
             }
         }

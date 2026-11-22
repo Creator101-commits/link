@@ -5,17 +5,17 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Bridge</string>
+    <string>Link</string>
     <key>CFBundleExecutable</key>
-    <string>BridgeShare</string>
+    <string>LinkShare</string>
     <key>CFBundleIconFile</key>
-    <string>Bridge</string>
+    <string>Link</string>
     <key>CFBundleIdentifier</key>
     <string>com.link.bridge.share</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>BridgeShare</string>
+    <string>LinkShare</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>
@@ -55,7 +55,7 @@
         <key>NSExtensionPointIdentifier</key>
         <string>com.apple.share-services</string>
         <key>NSExtensionPrincipalClass</key>
-        <string>BridgeShare.ShareController</string>
+        <string>LinkShare.ShareController</string>
     </dict>
 </dict>
 </plist>

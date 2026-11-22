@@ -143,7 +143,7 @@ class ClipboardSyncAccessibilityService : AccessibilityService() {
     }
 
     private fun launchFocusReader() {
-        if (!BridgePrefs.isPaired(this)) return
+        if (!LinkPrefs.isPaired(this)) return
         val now = System.currentTimeMillis()
         if (now - lastFocusReaderLaunch < 350) return
         lastFocusReaderLaunch = now

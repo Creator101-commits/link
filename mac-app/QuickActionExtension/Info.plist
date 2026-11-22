@@ -5,17 +5,17 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Share with Bridge</string>
+    <string>Share with Link</string>
     <key>CFBundleExecutable</key>
-    <string>BridgeQuickAction</string>
+    <string>LinkQuickAction</string>
     <key>CFBundleIconFile</key>
-    <string>Bridge</string>
+    <string>Link</string>
     <key>CFBundleIdentifier</key>
     <string>com.link.bridge.quickaction</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Share with Bridge</string>
+    <string>Share with Link</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>
@@ -56,14 +56,14 @@
             <key>NSExtensionServiceFinderPreviewIconName</key>
             <string>NSActionTemplate</string>
             <key>NSExtensionServiceFinderPreviewLabel</key>
-            <string>Share with Bridge</string>
+            <string>Share with Link</string>
             <key>NSExtensionServiceRoleType</key>
             <string>NSExtensionServiceRoleTypeViewer</string>
         </dict>
         <key>NSExtensionPointIdentifier</key>
         <string>com.apple.services</string>
         <key>NSExtensionPrincipalClass</key>
-        <string>BridgeQuickAction.ShareController</string>
+        <string>LinkQuickAction.ShareController</string>
     </dict>
 </dict>
 </plist>

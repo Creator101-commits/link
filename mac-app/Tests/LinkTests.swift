@@ -59,47 +59,47 @@ private func runCryptoAndAuthHelperTests() {
 }
 
 private func runPayloadAndVersionTests() throws {
-    let payload = ClipboardPayload(type: "clip", hash: "deadbeef", text: "Hello Bridge", device: "Mac")
+    let payload = ClipboardPayload(type: "clip", hash: "deadbeef", text: "Hello Link", device: "Mac")
     let data = try JSONEncoder().encode(payload)
     let decoded = try JSONDecoder().decode(ClipboardPayload.self, from: data)
     expect(decoded.type == "clip", "Decoded payload type mismatch")
     expect(decoded.hash == "deadbeef", "Decoded payload hash mismatch")
-    expect(decoded.text == "Hello Bridge", "Decoded payload text mismatch")
+    expect(decoded.text == "Hello Link", "Decoded payload text mismatch")
 
-    expect(BridgeModel.isNewerVersion(remote: "1.3.2", current: "1.3.1"), "1.3.2 should be newer than 1.3.1")
-    expect(BridgeModel.isNewerVersion(remote: "v1.4.0", current: "1.3.1"), "v1.4.0 should be newer than 1.3.1")
-    expect(BridgeModel.isNewerVersion(remote: "1.2", current: "1.1.1"), "1.2 should be newer than 1.1.1")
-    expect(!BridgeModel.isNewerVersion(remote: "1.2.0", current: "1.2"), "1.2.0 should equal 1.2")
-    expect(!BridgeModel.isNewerVersion(remote: "1.3.1", current: "1.3.1"), "Equal versions should return false")
+    expect(LinkModel.isNewerVersion(remote: "1.3.2", current: "1.3.1"), "1.3.2 should be newer than 1.3.1")
+    expect(LinkModel.isNewerVersion(remote: "v1.4.0", current: "1.3.1"), "v1.4.0 should be newer than 1.3.1")
+    expect(LinkModel.isNewerVersion(remote: "1.2", current: "1.1.1"), "1.2 should be newer than 1.1.1")
+    expect(!LinkModel.isNewerVersion(remote: "1.2.0", current: "1.2"), "1.2.0 should equal 1.2")
+    expect(!LinkModel.isNewerVersion(remote: "1.3.1", current: "1.3.1"), "Equal versions should return false")
 }
 
 private func runFileTransferSecurityTests() throws {
-    let traversed = BridgeFileTransferManager.sanitizeFileName("../../etc/passwd")
+    let traversed = LinkFileTransferManager.sanitizeFileName("../../etc/passwd")
     expect(!traversed.contains("/"), "Sanitized filename must not contain '/'")
     let destDir = URL(fileURLWithPath: "/tmp/bridge-dest")
     let resolved = destDir.appendingPathComponent(traversed).standardized
     expect(resolved.deletingLastPathComponent().path == destDir.path, "Sanitized filename must not escape destination directory")
 
-    let backslash = BridgeFileTransferManager.sanitizeFileName("..\\..\\evil.txt")
+    let backslash = LinkFileTransferManager.sanitizeFileName("..\\..\\evil.txt")
     expect(!backslash.contains("\\"), "Sanitized filename must not contain '\\'")
 
-    let dotfile = BridgeFileTransferManager.sanitizeFileName(".zshrc")
+    let dotfile = LinkFileTransferManager.sanitizeFileName(".zshrc")
     expect(!dotfile.hasPrefix("."), "Sanitized filename must strip leading dots")
 
-    let emptyFallback = BridgeFileTransferManager.sanitizeFileName("...")
+    let emptyFallback = LinkFileTransferManager.sanitizeFileName("...")
     expect(emptyFallback.hasPrefix("file_"), "Empty/dot-only filename should use safe fallback")
 
     let longName = String(repeating: "a", count: 250) + ".txt"
-    expect(BridgeFileTransferManager.sanitizeFileName(longName).count == 200, "Sanitized filename should cap at 200 chars")
+    expect(LinkFileTransferManager.sanitizeFileName(longName).count == 200, "Sanitized filename should cap at 200 chars")
 
     // AES-256-GCM key derivation & roundtrip
-    let token = BridgeFileTransferManager.generateSecureToken()
+    let token = LinkFileTransferManager.generateSecureToken()
     expect(token.count == 64, "Secure token should be 64 hex chars")
 
-    let key = BridgeFileTransferManager.deriveAesKey(token: token)
+    let key = LinkFileTransferManager.deriveAesKey(token: token)
     expect(key.bitCount == 256, "Expected 256-bit AES key")
 
-    let plaintext = Data("Bridge AES-GCM test chunk".utf8)
+    let plaintext = Data("Link AES-GCM test chunk".utf8)
     let sealed = try AES.GCM.seal(plaintext, using: key)
     let combined = sealed.combined!
     let opened = try AES.GCM.open(AES.GCM.SealedBox(combined: combined), using: key)
@@ -115,7 +115,7 @@ private func runFileTransferSecurityTests() throws {
     }
 
     // Data socket authentication proof (never sends raw token on the data socket)
-    let dataAuth = BridgeFileTransferManager.computeDataSocketAuth(
+    let dataAuth = LinkFileTransferManager.computeDataSocketAuth(
         token: "sample-transfer-token",
         transferId: "tx_12345",
         offset: 65536
@@ -161,16 +161,16 @@ private func runFileTransferSecurityTests() throws {
 }
 
 private func runSpekeAndSessionCipherTests() {
-    // 1. Deterministic cross-platform SPEKE test vector (matches Android BridgeCoreUnitTest)
+    // 1. Deterministic cross-platform SPEKE test vector (matches Android LinkCoreUnitTest)
     let code = "482910"
     let clientNonce = "00112233445566778899aabbccddeeff"
     let serverNonce = "ffeeddccbbaa99887766554433221100"
     let clientScalar = BigUInt2048(bigEndianBytes: Array(SHA256.hash(data: Data("deterministic-client-scalar".utf8))))
     let serverScalar = BigUInt2048(bigEndianBytes: Array(SHA256.hash(data: Data("deterministic-server-scalar".utf8))))
 
-    let gen = BridgeSpeke.deriveGenerator(pairingCode: code, clientNonce: clientNonce)
-    let clientPubHex = BridgeSpeke.computePublicElement(generator: gen, privateScalar: clientScalar)
-    let serverPubHex = BridgeSpeke.computePublicElement(generator: gen, privateScalar: serverScalar)
+    let gen = LinkSpeke.deriveGenerator(pairingCode: code, clientNonce: clientNonce)
+    let clientPubHex = LinkSpeke.computePublicElement(generator: gen, privateScalar: clientScalar)
+    let serverPubHex = LinkSpeke.computePublicElement(generator: gen, privateScalar: serverScalar)
 
     expect(
         clientPubHex.hasPrefix("1b4f3adc32b2cd3737115a7a07b5579d483b136f1784520dd2fd505aa2ec9b4f"),
@@ -181,15 +181,15 @@ private func runSpekeAndSessionCipherTests() {
         "Deterministic SPEKE server public key prefix mismatch"
     )
 
-    let clientShared = BridgeSpeke.computeSharedSecret(peerPublicHex: serverPubHex, privateScalar: clientScalar)
-    let serverShared = BridgeSpeke.computeSharedSecret(peerPublicHex: clientPubHex, privateScalar: serverScalar)
+    let clientShared = LinkSpeke.computeSharedSecret(peerPublicHex: serverPubHex, privateScalar: clientScalar)
+    let serverShared = LinkSpeke.computeSharedSecret(peerPublicHex: clientPubHex, privateScalar: serverScalar)
     expect(clientShared != nil && clientShared == serverShared, "SPEKE shared secrets must match")
     expect(
         clientShared?.hasPrefix("129b5d17f6f0fb9fe3ae58cae7230fa8c4e1b0dfabf044c52005c6e3781f001f") == true,
         "Deterministic SPEKE shared secret prefix mismatch"
     )
 
-    let material = BridgeSpeke.deriveSessionMaterial(
+    let material = LinkSpeke.deriveSessionMaterial(
         sharedSecretHex: clientShared!,
         pairingCode: code,
         clientNonce: clientNonce,
@@ -215,31 +215,31 @@ private func runSpekeAndSessionCipherTests() {
     )
 
     // 2. Reject invalid group elements (0, 1, p-1, p, malformed)
-    expect(!BridgeSpeke.isValidPublicElement(""), "Empty public element must be rejected")
-    expect(!BridgeSpeke.isValidPublicElement("0"), "0 must be rejected")
-    expect(!BridgeSpeke.isValidPublicElement("1"), "1 must be rejected")
-    expect(!BridgeSpeke.isValidPublicElement(BridgeSpeke.primeMinusTwo.toHex() + "00"), "Over-length element must be rejected")
-    let pMinusOneHex = BigUInt2048(BigUInt2048.subtract(BridgeSpeke.prime.limbs, [1])).toHex()
-    expect(!BridgeSpeke.isValidPublicElement(pMinusOneHex), "p-1 must be rejected")
-    expect(!BridgeSpeke.isValidPublicElement(BridgeSpeke.pHex), "p must be rejected")
+    expect(!LinkSpeke.isValidPublicElement(""), "Empty public element must be rejected")
+    expect(!LinkSpeke.isValidPublicElement("0"), "0 must be rejected")
+    expect(!LinkSpeke.isValidPublicElement("1"), "1 must be rejected")
+    expect(!LinkSpeke.isValidPublicElement(LinkSpeke.primeMinusTwo.toHex() + "00"), "Over-length element must be rejected")
+    let pMinusOneHex = BigUInt2048(BigUInt2048.subtract(LinkSpeke.prime.limbs, [1])).toHex()
+    expect(!LinkSpeke.isValidPublicElement(pMinusOneHex), "p-1 must be rejected")
+    expect(!LinkSpeke.isValidPublicElement(LinkSpeke.pHex), "p must be rejected")
 
-    // 3. Deterministic cross-platform AES-256-GCM BridgeSessionCipher vector + replay/tamper defense
+    // 3. Deterministic cross-platform AES-256-GCM LinkSessionCipher vector + replay/tamper defense
     let testKey = SymmetricKey(data: SHA256.hash(data: Data("test-session-key".utf8)))
-    let clientCipher = BridgeSessionCipher(
+    let clientCipher = LinkSessionCipher(
         sendKey: material.c2sKey,
         receiveKey: material.s2cKey,
         sendDirection: "c2s",
         receiveDirection: "s2c"
     )
-    let serverCipher = BridgeSessionCipher(
+    let serverCipher = LinkSessionCipher(
         sendKey: material.s2cKey,
         receiveKey: material.c2sKey,
         sendDirection: "s2c",
         receiveDirection: "c2s"
     )
 
-    let vecSender = BridgeSessionCipher(sendKey: testKey, receiveKey: testKey, sendDirection: "c2s", receiveDirection: "c2s")
-    let vecReceiver = BridgeSessionCipher(sendKey: testKey, receiveKey: testKey, sendDirection: "c2s", receiveDirection: "c2s")
+    let vecSender = LinkSessionCipher(sendKey: testKey, receiveKey: testKey, sendDirection: "c2s", receiveDirection: "c2s")
+    let vecReceiver = LinkSessionCipher(sendKey: testKey, receiveKey: testKey, sendDirection: "c2s", receiveDirection: "c2s")
     let vecPlain = Data("{\"type\":\"clip\",\"text\":\"secret hello\"}".utf8)
     let vecLine = vecSender.seal(vecPlain, saltOverride: [0xAA, 0xBB, 0xCC, 0xDD])!
     let vecJson = try! JSONSerialization.jsonObject(with: vecLine) as! [String: Any]
@@ -269,12 +269,12 @@ private func runSpekeAndSessionCipherTests() {
 }
 
 private func runHandshakeGateTests() {
-    let gate = BridgeHandshakeGate()
+    let gate = LinkHandshakeGate()
     let code = "482913"
     let nonce1 = "0123456789abcdef0123456789abcdef"
     let clientScalar1 = BigUInt2048(bigEndianBytes: Array(SHA256.hash(data: Data("client-scalar-1".utf8))))
-    let gen1 = BridgeSpeke.deriveGenerator(pairingCode: code, clientNonce: nonce1)
-    let clientPub1 = BridgeSpeke.computePublicElement(generator: gen1, privateScalar: clientScalar1)
+    let gen1 = LinkSpeke.deriveGenerator(pairingCode: code, clientNonce: nonce1)
+    let clientPub1 = LinkSpeke.computePublicElement(generator: gen1, privateScalar: clientScalar1)
 
     // 1. Valid two-phase SPEKE handshake succeeds
     let helloOk = gate.evaluateHello(
@@ -285,8 +285,8 @@ private func runHandshakeGateTests() {
     )
     expect(helloOk.challengeIssued && helloOk.serverPublicHex != nil, "Valid SPEKE hello should issue challenge")
 
-    let clientShared1 = BridgeSpeke.computeSharedSecret(peerPublicHex: helloOk.serverPublicHex!, privateScalar: clientScalar1)!
-    let clientMat1 = BridgeSpeke.deriveSessionMaterial(
+    let clientShared1 = LinkSpeke.computeSharedSecret(peerPublicHex: helloOk.serverPublicHex!, privateScalar: clientScalar1)!
+    let clientMat1 = LinkSpeke.deriveSessionMaterial(
         sharedSecretHex: clientShared1,
         pairingCode: code,
         clientNonce: nonce1,
@@ -331,8 +331,8 @@ private func runHandshakeGateTests() {
 
     // 4. Wrong pairing code fails at evaluateAuth and records failed attempt
     let wrongNonce = "aaaaaaaabbbbbbbbccccccccdddddddd"
-    let wrongGen = BridgeSpeke.deriveGenerator(pairingCode: "999999", clientNonce: wrongNonce)
-    let wrongPub = BridgeSpeke.computePublicElement(generator: wrongGen, privateScalar: clientScalar1)
+    let wrongGen = LinkSpeke.deriveGenerator(pairingCode: "999999", clientNonce: wrongNonce)
+    let wrongPub = LinkSpeke.computePublicElement(generator: wrongGen, privateScalar: clientScalar1)
     let wrongHello = gate.evaluateHello(
         jsonObject: ["type": "hello", "text": wrongNonce, "data": wrongPub],
         pairingCode: code,
@@ -340,8 +340,8 @@ private func runHandshakeGateTests() {
         now: 1004
     )
     expect(wrongHello.challengeIssued, "Challenge issued without leaking whether code matched")
-    let wrongShared = BridgeSpeke.computeSharedSecret(peerPublicHex: wrongHello.serverPublicHex!, privateScalar: clientScalar1)!
-    let wrongMat = BridgeSpeke.deriveSessionMaterial(
+    let wrongShared = LinkSpeke.computeSharedSecret(peerPublicHex: wrongHello.serverPublicHex!, privateScalar: clientScalar1)!
+    let wrongMat = LinkSpeke.deriveSessionMaterial(
         sharedSecretHex: wrongShared,
         pairingCode: "999999",
         clientNonce: wrongNonce,
@@ -359,7 +359,7 @@ private func runHandshakeGateTests() {
     expect(!wrongAuth.authenticated && wrongAuth.failureReason == .invalidProof, "Wrong pairing code must fail SPEKE auth proof")
 
     // 5. Per-IP lockout after 5 failed attempts
-    let ipGate = BridgeHandshakeGate()
+    let ipGate = LinkHandshakeGate()
     for i in 0..<5 {
         let res = ipGate.evaluateHello(
             jsonObject: ["type": "hello", "text": "nonce_\(i)_0123456789abcdef", "data": "invalid"],
@@ -386,7 +386,7 @@ private func runHandshakeGateTests() {
     expect(afterIpCooldown.challengeIssued, "IP should unlock after 60s lockout expires")
 
     // 6. Global lockout triggers after 10 failures across distinct IPs and blocks a brand new IP
-    let globalGate = BridgeHandshakeGate()
+    let globalGate = LinkHandshakeGate()
     for i in 0..<10 {
         let res = globalGate.evaluateHello(
             jsonObject: ["type": "hello", "text": "global_\(i)_0123456789abcdef", "data": "invalid"],
@@ -430,7 +430,7 @@ private func runHandshakeGateTests() {
 private func runBluetoothRelayHeaderTests() {
     // Valid header followed by payload bytes: headerLength covers only the header line.
     let validWithTrailing = Data("{\"relay\":8765}\n{\"type\":\"enc\"}".utf8)
-    if let parsed = BridgeBluetoothRelay.parseRelayHeader(validWithTrailing) {
+    if let parsed = LinkBluetoothRelay.parseRelayHeader(validWithTrailing) {
         expect(parsed.port == 8765, "Relay header should parse port 8765")
         expect(parsed.headerLength == "{\"relay\":8765}\n".utf8.count, "headerLength should end after the newline, before payload")
         let remainder = validWithTrailing.subdata(in: parsed.headerLength..<validWithTrailing.count)
@@ -441,28 +441,28 @@ private func runBluetoothRelayHeaderTests() {
 
     // Ephemeral file-transfer data ports are valid relay targets too.
     let dataPort = Data("{\"relay\":54321}\n".utf8)
-    expect(BridgeBluetoothRelay.parseRelayHeader(dataPort)?.port == 54321, "Data socket port should parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(dataPort)?.port == 54321, "Data socket port should parse")
 
     // Missing newline -> incomplete -> nil
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("{\"relay\":8765}".utf8)) == nil, "Header without newline must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("{\"relay\":8765}".utf8)) == nil, "Header without newline must not parse")
 
     // Oversized header (>128 bytes) without a newline -> nil
     let oversized = Data(repeating: UInt8(ascii: "a"), count: 200)
-    expect(BridgeBluetoothRelay.parseRelayHeader(oversized) == nil, "Oversized header must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(oversized) == nil, "Oversized header must not parse")
     let oversizedWithNewline = Data((String(repeating: "a", count: 130) + "\n").utf8)
-    expect(BridgeBluetoothRelay.parseRelayHeader(oversizedWithNewline) == nil, "Header line over 128 bytes must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(oversizedWithNewline) == nil, "Header line over 128 bytes must not parse")
 
     // Non-JSON / wrong shape -> nil
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("not json\n".utf8)) == nil, "Non-JSON header must not parse")
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("{\"relay\":\"8765\"}\n".utf8)) == nil, "String port must not parse")
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("{\"other\":8765}\n".utf8)) == nil, "Missing relay key must not parse")
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("\n".utf8)) == nil, "Empty header line must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("not json\n".utf8)) == nil, "Non-JSON header must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("{\"relay\":\"8765\"}\n".utf8)) == nil, "String port must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("{\"other\":8765}\n".utf8)) == nil, "Missing relay key must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("\n".utf8)) == nil, "Empty header line must not parse")
 
     // Out-of-range ports -> nil
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("{\"relay\":0}\n".utf8)) == nil, "Port 0 must not parse")
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("{\"relay\":70000}\n".utf8)) == nil, "Port 70000 must not parse")
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("{\"relay\":-1}\n".utf8)) == nil, "Negative port must not parse")
-    expect(BridgeBluetoothRelay.parseRelayHeader(Data("{\"relay\":65535}\n".utf8))?.port == 65535, "Max valid port should parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("{\"relay\":0}\n".utf8)) == nil, "Port 0 must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("{\"relay\":70000}\n".utf8)) == nil, "Port 70000 must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("{\"relay\":-1}\n".utf8)) == nil, "Negative port must not parse")
+    expect(LinkBluetoothRelay.parseRelayHeader(Data("{\"relay\":65535}\n".utf8))?.port == 65535, "Max valid port should parse")
 }
 
 private func runFastLinkManagerTests() {
@@ -473,7 +473,7 @@ private func runFastLinkManagerTests() {
         "ssid": "AndroidShare_1234",
         "psk": "correct horse battery"
     ]
-    let offer = BridgeFastLinkManager.parseOffer(valid)
+    let offer = FastLinkManager.parseOffer(valid)
     expect(offer?.session == "sess-1234-abcd", "Valid offer should parse session")
     expect(offer?.ssid == "AndroidShare_1234", "Valid offer should parse ssid")
     expect(offer?.psk == "correct horse battery", "Valid offer should parse psk")
@@ -481,59 +481,59 @@ private func runFastLinkManagerTests() {
     // Bad session shapes
     var bad = valid
     bad["session"] = "short"
-    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "Session under 8 chars must not parse")
+    expect(FastLinkManager.parseOffer(bad) == nil, "Session under 8 chars must not parse")
     bad["session"] = String(repeating: "a", count: 65)
-    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "Session over 64 chars must not parse")
+    expect(FastLinkManager.parseOffer(bad) == nil, "Session over 64 chars must not parse")
     bad["session"] = "sess 1234 ab" // space not allowed
-    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "Session with space must not parse")
+    expect(FastLinkManager.parseOffer(bad) == nil, "Session with space must not parse")
 
     // SSID length: 0 bytes and 33 bytes rejected
     bad = valid
     bad["ssid"] = ""
-    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "Empty ssid must not parse")
+    expect(FastLinkManager.parseOffer(bad) == nil, "Empty ssid must not parse")
     bad["ssid"] = String(repeating: "s", count: 33)
-    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "SSID over 32 bytes must not parse")
+    expect(FastLinkManager.parseOffer(bad) == nil, "SSID over 32 bytes must not parse")
     bad["ssid"] = String(repeating: "é", count: 17) // 34 utf8 bytes
-    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "SSID over 32 utf8 bytes must not parse")
+    expect(FastLinkManager.parseOffer(bad) == nil, "SSID over 32 utf8 bytes must not parse")
 
     // PSK: 7 chars rejected, 64 hex ok, 64 non-hex rejected
     bad = valid
     bad["psk"] = "1234567"
-    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "PSK under 8 chars must not parse")
+    expect(FastLinkManager.parseOffer(bad) == nil, "PSK under 8 chars must not parse")
     bad["psk"] = String(repeating: "a", count: 64) // valid hex
-    expect(BridgeFastLinkManager.parseOffer(bad) != nil, "64-hex PSK should parse")
+    expect(FastLinkManager.parseOffer(bad) != nil, "64-hex PSK should parse")
     bad["psk"] = String(repeating: "g", count: 64) // non-hex
-    expect(BridgeFastLinkManager.parseOffer(bad) == nil, "64 non-hex PSK must not parse")
+    expect(FastLinkManager.parseOffer(bad) == nil, "64 non-hex PSK must not parse")
     bad["psk"] = String(repeating: "z", count: 63) // 63 non-hex chars is still a valid passphrase
-    expect(BridgeFastLinkManager.parseOffer(bad) != nil, "63-char PSK should parse")
+    expect(FastLinkManager.parseOffer(bad) != nil, "63-char PSK should parse")
 
     // isUsableHotspotIPv4
-    expect(BridgeFastLinkManager.isUsableHotspotIPv4("192.168.43.12"), "192.168.x should be usable")
-    expect(BridgeFastLinkManager.isUsableHotspotIPv4("10.0.0.5"), "10.x should be usable")
-    expect(BridgeFastLinkManager.isUsableHotspotIPv4("172.20.1.2"), "172.16-31.x should be usable")
-    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("127.0.0.1"), "Loopback must not be usable")
-    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("169.254.1.1"), "Link-local must not be usable")
-    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("8.8.8.8"), "Public IP must not be usable")
-    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("172.15.0.1"), "172.15.x is outside RFC1918")
-    expect(!BridgeFastLinkManager.isUsableHotspotIPv4("not-an-ip"), "Non-IP must not be usable")
+    expect(FastLinkManager.isUsableHotspotIPv4("192.168.43.12"), "192.168.x should be usable")
+    expect(FastLinkManager.isUsableHotspotIPv4("10.0.0.5"), "10.x should be usable")
+    expect(FastLinkManager.isUsableHotspotIPv4("172.20.1.2"), "172.16-31.x should be usable")
+    expect(!FastLinkManager.isUsableHotspotIPv4("127.0.0.1"), "Loopback must not be usable")
+    expect(!FastLinkManager.isUsableHotspotIPv4("169.254.1.1"), "Link-local must not be usable")
+    expect(!FastLinkManager.isUsableHotspotIPv4("8.8.8.8"), "Public IP must not be usable")
+    expect(!FastLinkManager.isUsableHotspotIPv4("172.15.0.1"), "172.15.x is outside RFC1918")
+    expect(!FastLinkManager.isUsableHotspotIPv4("not-an-ip"), "Non-IP must not be usable")
 
     // restorePlan branches
-    if case .rejoin(let ssid) = BridgeFastLinkManager.restorePlan(previousSSID: "HomeWiFi", wasOnWifi: true) {
+    if case .rejoin(let ssid) = FastLinkManager.restorePlan(previousSSID: "HomeWiFi", wasOnWifi: true) {
         expect(ssid == "HomeWiFi", "restorePlan should rejoin previous SSID")
     } else {
         expect(false, "restorePlan with previousSSID should be .rejoin")
     }
-    if case .powerCycle = BridgeFastLinkManager.restorePlan(previousSSID: nil, wasOnWifi: true) {
+    if case .powerCycle = FastLinkManager.restorePlan(previousSSID: nil, wasOnWifi: true) {
         // expected
     } else {
         expect(false, "restorePlan nil SSID + wasOnWifi should be .powerCycle")
     }
-    if case .disassociateOnly = BridgeFastLinkManager.restorePlan(previousSSID: nil, wasOnWifi: false) {
+    if case .disassociateOnly = FastLinkManager.restorePlan(previousSSID: nil, wasOnWifi: false) {
         // expected
     } else {
         expect(false, "restorePlan nil SSID + !wasOnWifi should be .disassociateOnly")
     }
-    if case .rejoin(let ssid) = BridgeFastLinkManager.restorePlan(previousSSID: "  ", wasOnWifi: false) {
+    if case .rejoin(let ssid) = FastLinkManager.restorePlan(previousSSID: "  ", wasOnWifi: false) {
         expect(ssid == "  ", "Whitespace SSID still counts as present")
     } else {
         expect(false, "Whitespace-only SSID should still rejoin (ssid() returned it)")
@@ -546,12 +546,12 @@ private func containsScrollView(_ view: NSView) -> Bool {
 }
 
 private func runNotificationScrollLayoutTests() {
-    let model = BridgeModel(startServer: false)
+    let model = LinkModel(startServer: false)
     model.isConnected = true
     model.pairedDevice = "Galaxy"
     model.selectedTab = .notifications
 
-    let notifManager = BridgeNotificationManager.shared
+    let notifManager = LinkNotificationManager.shared
     let originalNotifications = notifManager.activeNotifications
     defer {
         notifManager.activeNotifications = originalNotifications
@@ -559,9 +559,9 @@ private func runNotificationScrollLayoutTests() {
 
     // 1. Single short notification stays compact without forcing full 280pt ScrollView height
     notifManager.activeNotifications = [
-        BridgeNotification(id: "short-1", app: "Messages", title: "Alice", text: "On my way!")
+        LinkNotification(id: "short-1", app: "Messages", title: "Alice", text: "On my way!")
     ]
-    let shortHost = NSHostingController(rootView: BridgeMenuView(model: model))
+    let shortHost = NSHostingController(rootView: LinkMenuView(model: model))
     let shortWin = NSWindow(contentViewController: shortHost)
     shortWin.setFrame(NSRect(x: 0, y: 0, width: 380, height: 600), display: false)
     shortHost.view.layoutSubtreeIfNeeded()
@@ -570,27 +570,27 @@ private func runNotificationScrollLayoutTests() {
     // 2. Single very long notification (8 multi-line stacked messages + reply + actions)
     //    must cap at the 280pt ScrollView height so the popover never overflows/displaces.
     let stackedMessages = (1...8).map { idx in
-        BridgeMessageItem(
+        LinkMessageItem(
             text: "Message \(idx): This is a multi-line group chat notification body that would otherwise stretch the menu bar popover past the screen height.",
             timestamp: Int64(1700000000000 + idx),
             sender: "Member \(idx)"
         )
     }
     notifManager.activeNotifications = [
-        BridgeNotification(
+        LinkNotification(
             id: "long-1",
             app: "WhatsApp",
             title: "Pioneers (23 messages)",
             text: stackedMessages.last?.text,
             actions: [
-                BridgeNotificationAction(id: 0, title: "Reply", hasInput: true, placeholder: "Reply"),
-                BridgeNotificationAction(id: 1, title: "Mark as read"),
-                BridgeNotificationAction(id: 2, title: "Mute")
+                LinkNotificationAction(id: 0, title: "Reply", hasInput: true, placeholder: "Reply"),
+                LinkNotificationAction(id: 1, title: "Mark as read"),
+                LinkNotificationAction(id: 2, title: "Mute")
             ],
             messages: stackedMessages
         )
     ]
-    let longHost = NSHostingController(rootView: BridgeMenuView(model: model))
+    let longHost = NSHostingController(rootView: LinkMenuView(model: model))
     let longWin = NSWindow(contentViewController: longHost)
     longWin.setFrame(NSRect(x: 0, y: 0, width: 380, height: 600), display: false)
     longHost.view.layoutSubtreeIfNeeded()
@@ -604,28 +604,28 @@ private func runNotificationScrollLayoutTests() {
 private func runAdaptiveAndIconCacheTests() {
     // heartbeatAction: stale thresholds differ per transport, ping when silent.
     let now: TimeInterval = 1000
-    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 5, isBluetooth: false) == .none, "LAN conn seen 5s ago: no action")
-    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 5, isBluetooth: true) == .none, "BT conn seen 5s ago: no action")
-    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 10, isBluetooth: false) == .ping, "LAN conn silent 10s: ping")
-    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 25, isBluetooth: false) == .stale, "LAN conn silent 25s (>20): stale")
-    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 25, isBluetooth: true) == .ping, "BT conn silent 25s (<30): still ping, not stale")
-    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 35, isBluetooth: true) == .stale, "BT conn silent 35s (>30): stale")
-    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 19, isBluetooth: false) == .ping, "LAN conn silent 19s: ping (under 20s stale)")
+    expect(LinkServer.heartbeatAction(now: now, lastSeen: now - 5, isBluetooth: false) == .none, "LAN conn seen 5s ago: no action")
+    expect(LinkServer.heartbeatAction(now: now, lastSeen: now - 5, isBluetooth: true) == .none, "BT conn seen 5s ago: no action")
+    expect(LinkServer.heartbeatAction(now: now, lastSeen: now - 10, isBluetooth: false) == .ping, "LAN conn silent 10s: ping")
+    expect(LinkServer.heartbeatAction(now: now, lastSeen: now - 25, isBluetooth: false) == .stale, "LAN conn silent 25s (>20): stale")
+    expect(LinkServer.heartbeatAction(now: now, lastSeen: now - 25, isBluetooth: true) == .ping, "BT conn silent 25s (<30): still ping, not stale")
+    expect(LinkServer.heartbeatAction(now: now, lastSeen: now - 35, isBluetooth: true) == .stale, "BT conn silent 35s (>30): stale")
+    expect(LinkServer.heartbeatAction(now: now, lastSeen: now - 19, isBluetooth: false) == .ping, "LAN conn silent 19s: ping (under 20s stale)")
 
     // BLE relay latency hysteresis: low at >=8KB/s, high after 5s quiet.
-    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .highLatency, bytesInWindow: 8192, msSinceLastByte: 0) == .lowLatency, "8KB window engages low latency")
-    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .highLatency, bytesInWindow: 4096, msSinceLastByte: 0) == .highLatency, "4KB window stays high latency")
-    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 0, msSinceLastByte: 6000) == .highLatency, "5s+ quiet releases to high latency")
-    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 0, msSinceLastByte: 4000) == .lowLatency, "4s quiet stays low latency")
-    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 9000, msSinceLastByte: 0) == .lowLatency, "active low-latency session stays low")
+    expect(LinkBluetoothRelay.desiredRelayLatency(current: .highLatency, bytesInWindow: 8192, msSinceLastByte: 0) == .lowLatency, "8KB window engages low latency")
+    expect(LinkBluetoothRelay.desiredRelayLatency(current: .highLatency, bytesInWindow: 4096, msSinceLastByte: 0) == .highLatency, "4KB window stays high latency")
+    expect(LinkBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 0, msSinceLastByte: 6000) == .highLatency, "5s+ quiet releases to high latency")
+    expect(LinkBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 0, msSinceLastByte: 4000) == .lowLatency, "4s quiet stays low latency")
+    expect(LinkBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 9000, msSinceLastByte: 0) == .lowLatency, "active low-latency session stays low")
 
     // Icon cache filename: SHA-256 hex (64 chars) + ".png"; pkg never in path.
-    let name = BridgeAppIconCache.cacheFileName(forPkg: "../../etc/passwd")
+    let name = LinkAppIconCache.cacheFileName(forPkg: "../../etc/passwd")
     expect(name.hasSuffix(".png"), "Icon cache filename ends with .png")
     expect(name.dropLast(4).count == 64, "Icon cache filename stem is 64 hex chars")
     expect(name.dropLast(4).allSatisfy { $0.isHexDigit }, "Icon cache filename stem is hex only")
     expect(!name.contains("passwd") && !name.contains("/"), "Pkg path traversal cannot reach filename")
-    expect(BridgeAppIconCache.cacheFileName(forPkg: "com.whatsapp") != name, "Distinct pkgs get distinct filenames")
+    expect(LinkAppIconCache.cacheFileName(forPkg: "com.whatsapp") != name, "Distinct pkgs get distinct filenames")
 
     // parseFrames: 2 complete frames + partial third inside a slice with a
     // non-zero startIndex; each payload must open as AES.GCM combined.
@@ -648,7 +648,7 @@ private func runAdaptiveAndIconCacheTests() {
     let slice = blob[3..<blob.count]
     expect(slice.startIndex != 0, "Test slice must have non-zero startIndex")
 
-    let parsed = BridgeFileTransferManager.parseFrames(slice, maxFrameLen: 64 * 1024 + 2048)
+    let parsed = LinkFileTransferManager.parseFrames(slice, maxFrameLen: 64 * 1024 + 2048)
     expect(parsed.frames.count == 2, "parseFrames found \(parsed.frames.count) frames, expected 2")
     expect(parsed.consumed == f1.count + f2.count, "parseFrames consumed \(parsed.consumed), expected \(f1.count + f2.count)")
     expect(!parsed.corrupt, "parseFrames flagged corrupt on valid input")
@@ -662,7 +662,7 @@ private func runAdaptiveAndIconCacheTests() {
     // Corrupt length prefix must be reported.
     var bad = Data([0xFF, 0xFF, 0xFF, 0xFF])
     bad.append(Data(repeating: 0, count: 64))
-    let badParsed = BridgeFileTransferManager.parseFrames(bad, maxFrameLen: 1024)
+    let badParsed = LinkFileTransferManager.parseFrames(bad, maxFrameLen: 1024)
     expect(badParsed.corrupt, "parseFrames must flag corrupt length prefix")
     expect(badParsed.frames.isEmpty, "parseFrames returned frames before corrupt length")
 }
@@ -670,39 +670,39 @@ private func runAdaptiveAndIconCacheTests() {
 
 private func runPhaseBFeatureTests() {
     // securityLabel mapping
-    expect(BridgeWifiShare.securityLabel(.wpa3Personal) == "wpa3", "wpa3Personal -> wpa3")
-    expect(BridgeWifiShare.securityLabel(.wpa3Transition) == "wpa3", "wpa3Transition -> wpa3")
-    expect(BridgeWifiShare.securityLabel(.wpa2Personal) == "wpa2", "wpa2Personal -> wpa2")
-    expect(BridgeWifiShare.securityLabel(.wpaPersonal) == "wpa2", "wpaPersonal -> wpa2")
-    expect(BridgeWifiShare.securityLabel(.none) == "open", "none -> open")
-    expect(BridgeWifiShare.securityLabel(.dynamicWEP) == "wep", "dynamicWEP -> wep")
-    expect(BridgeWifiShare.securityLabel(.wpaEnterprise) == nil
-        || BridgeWifiShare.securityLabel(.wpa2Enterprise) == nil
-        || BridgeWifiShare.securityLabel(.wpa3Enterprise) == nil, "enterprise -> nil")
+    expect(LinkWifiShare.securityLabel(.wpa3Personal) == "wpa3", "wpa3Personal -> wpa3")
+    expect(LinkWifiShare.securityLabel(.wpa3Transition) == "wpa3", "wpa3Transition -> wpa3")
+    expect(LinkWifiShare.securityLabel(.wpa2Personal) == "wpa2", "wpa2Personal -> wpa2")
+    expect(LinkWifiShare.securityLabel(.wpaPersonal) == "wpa2", "wpaPersonal -> wpa2")
+    expect(LinkWifiShare.securityLabel(.none) == "open", "none -> open")
+    expect(LinkWifiShare.securityLabel(.dynamicWEP) == "wep", "dynamicWEP -> wep")
+    expect(LinkWifiShare.securityLabel(.wpaEnterprise) == nil
+        || LinkWifiShare.securityLabel(.wpa2Enterprise) == nil
+        || LinkWifiShare.securityLabel(.wpa3Enterprise) == nil, "enterprise -> nil")
     // parseSecurityOutput
-    expect(BridgeWifiShare.parseSecurityOutput(Data("hunter2\n".utf8)) == "hunter2",
+    expect(LinkWifiShare.parseSecurityOutput(Data("hunter2\n".utf8)) == "hunter2",
         "parseSecurityOutput trims trailing newline")
-    expect(BridgeWifiShare.parseSecurityOutput(Data("\n".utf8)) == nil,
+    expect(LinkWifiShare.parseSecurityOutput(Data("\n".utf8)) == nil,
         "parseSecurityOutput empty -> nil")
-    expect(BridgeWifiShare.parseSecurityOutput(Data("".utf8)) == nil,
+    expect(LinkWifiShare.parseSecurityOutput(Data("".utf8)) == nil,
         "parseSecurityOutput empty data -> nil")
 }
 
 private func runPhaseAFeatureTests() {
     // lowBatteryDecision
-    var r = BridgeDeviceStatus.lowBatteryDecision(level: 19, charging: false, threshold: 20, state: 0)
+    var r = LinkDeviceStatus.lowBatteryDecision(level: 19, charging: false, threshold: 20, state: 0)
     expect(r.alert == 19 && r.newState == 1, "low battery at 19% threshold 20 alerts once")
-    r = BridgeDeviceStatus.lowBatteryDecision(level: 18, charging: false, threshold: 20, state: 1)
+    r = LinkDeviceStatus.lowBatteryDecision(level: 18, charging: false, threshold: 20, state: 1)
     expect(r.alert == nil && r.newState == 1, "already-alerted discharge does not repeat")
-    r = BridgeDeviceStatus.lowBatteryDecision(level: 5, charging: true, threshold: 20, state: 1)
+    r = LinkDeviceStatus.lowBatteryDecision(level: 5, charging: true, threshold: 20, state: 1)
     expect(r.alert == nil && r.newState == 0, "charging re-arms the alert")
-    r = BridgeDeviceStatus.lowBatteryDecision(level: 50, charging: false, threshold: 20, state: 0)
+    r = LinkDeviceStatus.lowBatteryDecision(level: 50, charging: false, threshold: 20, state: 0)
     expect(r.alert == nil, "level above threshold does not alert")
-    r = BridgeDeviceStatus.lowBatteryDecision(level: 10, charging: false, threshold: 30, state: 0)
+    r = LinkDeviceStatus.lowBatteryDecision(level: 10, charging: false, threshold: 30, state: 0)
     expect(r.alert == 10, "threshold 30 still alerts at 10%")
-    r = BridgeDeviceStatus.lowBatteryDecision(level: 26, charging: false, threshold: 20, state: 1)
+    r = LinkDeviceStatus.lowBatteryDecision(level: 26, charging: false, threshold: 20, state: 1)
     expect(r.newState == 0, "level 5 above threshold re-arms")
-    r = BridgeDeviceStatus.lowBatteryDecision(level: 20, charging: false, threshold: 0, state: 0)
+    r = LinkDeviceStatus.lowBatteryDecision(level: 20, charging: false, threshold: 0, state: 0)
     expect(r.alert == nil, "threshold 0 (off) never alerts")
 
     // settings_sync appRules/skipSilent round-trip
@@ -721,7 +721,7 @@ private func runPhaseAFeatureTests() {
     expect((json["appRules"] as? [String: String])?["com.gmail"] == "off", "appRules updates")
 
     // appList: union of displayNames + rules, sorted by name, level defaults normal
-    let list = BridgeNotificationManager.appList(
+    let list = LinkNotificationManager.appList(
         displayNames: ["com.whatsapp": "WhatsApp", "com.instagram": "Instagram"],
         rules: ["com.whatsapp": "high", "com.gmail": "quiet"]
     )
@@ -734,11 +734,11 @@ private func runPhaseAFeatureTests() {
     let gm = list.first { $0.pkg == "com.gmail" }
     expect(gm?.name == "com.gmail" && gm?.level == "quiet", "ruled-only app uses pkg as name")
     // empty
-    expect(BridgeNotificationManager.appList(displayNames: [:], rules: [:]).isEmpty, "appList empty when no apps")
+    expect(LinkNotificationManager.appList(displayNames: [:], rules: [:]).isEmpty, "appList empty when no apps")
 }
 
 @main
-struct BridgeTestRunner {
+struct LinkTestRunner {
     static func main() {
         runLocalIpTests()
         runCryptoAndAuthHelperTests()
@@ -762,7 +762,7 @@ struct BridgeTestRunner {
             fputs("macOS unit tests failed: \(failureCount) failure(s)\n", stderr)
             exit(1)
         }
-        print("All macOS Bridge unit tests passed!")
+        print("All macOS Link unit tests passed!")
     }
 }
 
