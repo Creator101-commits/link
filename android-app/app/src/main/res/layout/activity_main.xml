@@ -440,7 +440,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
-                            android:text="• Keep Bluetooth on — no Wi-Fi or internet needed."
+                            android:text="• Keep Bluetooth on. No Wi-Fi or internet needed."
                             android:textColor="@color/secondary_label"
                             android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
@@ -673,7 +673,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
-                    android:text="Transfer files or folders over Bluetooth or local Wi-Fi — no internet needed."
+                    android:text="Transfer files or folders over Bluetooth or local Wi-Fi. No internet needed."
                     android:textColor="@color/secondary_label"
                     android:fontFamily="@font/sf_pro_text"
                     android:textSize="12.5sp"

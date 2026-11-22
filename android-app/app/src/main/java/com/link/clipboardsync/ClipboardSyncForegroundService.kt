@@ -73,7 +73,7 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
 
     private fun initialStatus(): String =
         if (BridgePrefs.isPaired(this)) "Connecting to ${BridgePrefs.macName(this) ?: "Mac"}…"
-        else "Not paired — open Bridge to connect your Mac"
+        else "Not paired. Open Bridge to connect your Mac."
 
     private fun startForegroundWithNotification(statusText: String) {
         createNotificationChannel()
