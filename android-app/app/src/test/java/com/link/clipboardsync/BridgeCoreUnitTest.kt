@@ -8,6 +8,10 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import android.telephony.TelephonyManager
+import android.net.ConnectivityManager
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigInteger
 import java.security.MessageDigest
@@ -483,5 +487,127 @@ class BridgeCoreUnitTest {
         // Cleared on (re)connect/disconnect so a new connection resends icons.
         AppIconDedup.clear()
         assertTrue(AppIconDedup.mark("com.example.a"))
+    }
+}
+
+class PhaseAUnitTest {
+    @Test
+    fun networkLabelMappings() {
+        // NR advanced -> 5G+, NR -> 5G
+        assertEquals("5G+", networkLabel(ConnectivityManager.TYPE_MOBILE, 21))
+        // dataNetworkType NR (20) -> 5G
+        assertEquals("5G", networkLabel(20, -1))
+        assertEquals("LTE+", networkLabel(ConnectivityManager.TYPE_MOBILE, 19))
+        assertEquals("LTE+", networkLabel(ConnectivityManager.TYPE_MOBILE, 29))
+        assertEquals("LTE", networkLabel(ConnectivityManager.TYPE_MOBILE, 13))
+        assertEquals("3G", networkLabel(ConnectivityManager.TYPE_MOBILE, 5))
+        assertEquals("3G", networkLabel(ConnectivityManager.TYPE_MOBILE, 8))
+        assertEquals("2G", networkLabel(ConnectivityManager.TYPE_MOBILE, 1))
+        assertEquals("2G", networkLabel(ConnectivityManager.TYPE_MOBILE, 2))
+        assertEquals("2G", networkLabel(ConnectivityManager.TYPE_MOBILE, 16))
+        assertEquals("", networkLabel(ConnectivityManager.TYPE_MOBILE, -1))
+        assertEquals("", networkLabel(-1, -1))
+        // override wins
+        assertEquals("5G", networkLabel(13, 20))
+    }
+
+    @Test
+    fun notificationForwardPolicy() {
+        // off always drops
+        assertFalse(NotificationForwardPolicy.shouldForward("off", 3, false, false, false))
+        // normal/high/quiet/muted forward
+        assertTrue(NotificationForwardPolicy.shouldForward("normal", 3, false, false, false))
+        assertTrue(NotificationForwardPolicy.shouldForward("high", 3, false, false, false))
+        // skipSilent drops low importance + ambient unless call/message
+        assertFalse(NotificationForwardPolicy.shouldForward(null, 2, false, true, false))
+        assertFalse(NotificationForwardPolicy.shouldForward(null, 3, true, true, false))
+        assertTrue(NotificationForwardPolicy.shouldForward(null, 2, false, true, true))
+        assertTrue(NotificationForwardPolicy.shouldForward(null, 3, true, true, true))
+        // skipSilent off -> always forward (except off rule)
+        assertTrue(NotificationForwardPolicy.shouldForward(null, 1, true, false, false))
+    }
+
+    @Test
+    fun appRulesJsonRoundTrip() {
+        val rules = mapOf("com.whatsapp" to "high", "com.instagram" to "muted")
+        val json = org.json.JSONObject(rules)
+        val back = mutableMapOf<String, String>()
+        val keys = json.keys()
+        while (keys.hasNext()) { val k = keys.next(); back[k] = json.optString(k) }
+        assertEquals(rules, back)
+    }
+}
+
+class CallStateMachineTest {
+    private fun states(events: List<CallEvent>) = events.map { it.state }
+
+    @Test
+    fun incomingFullFlow() {
+        val m = CallStateMachine()
+        // callback ringing (no number) then broadcast ringing (with number)
+        assertEquals(listOf("ringing"), states(m.onRinging(null)))
+        assertEquals(listOf("ringing"), states(m.onRinging("+15551234")))
+        val active = m.onOffhook(1000L)
+        assertEquals(listOf("active"), states(active))
+        assertEquals("incoming", active[0].direction)
+        assertEquals(1000L, active[0].startedAt)
+        assertEquals(listOf("ended"), states(m.onIdle()))
+        assertFalse(m.isInCall)
+    }
+
+    @Test
+    fun duplicatesProduceNoExtraEvents() {
+        val m = CallStateMachine()
+        m.onRinging(null)
+        // broadcast + callback both fire ringing again — no extra
+        assertTrue(m.onRinging(null).isEmpty())
+        assertTrue(m.onRinging("+1").isNotEmpty()) // number arrival re-emits once
+        assertTrue(m.onRinging("+1").isEmpty())    // same number again: nothing
+        // offhook fired twice (receiver + callback)
+        assertEquals(1, m.onOffhook(5L).size)
+        assertTrue(m.onOffhook(6L).isEmpty())
+        // idle fired twice
+        assertEquals(1, m.onIdle().size)
+        assertTrue(m.onIdle().isEmpty())
+    }
+
+    @Test
+    fun outgoingFlow() {
+        val m = CallStateMachine()
+        // offhook with no prior ringing => outgoing
+        val ev = m.onOffhook(2000L)
+        assertEquals(listOf("active"), states(ev))
+        assertEquals("outgoing", ev[0].direction)
+        assertEquals(2000L, ev[0].startedAt)
+        assertEquals(listOf("ended"), states(m.onIdle()))
+    }
+
+    @Test
+    fun missedCallRingingThenIdle() {
+        val m = CallStateMachine()
+        m.onRinging("+1555")
+        val ended = m.onIdle()
+        assertEquals(listOf("ended"), states(ended))
+        assertFalse(m.isInCall)
+    }
+
+    @Test
+    fun nameArrivalReemitsRinging() {
+        val m = CallStateMachine()
+        m.onRinging("+15551234")
+        // name arrives -> ringing re-emitted with name
+        val ev = m.onContactName("Mom")
+        assertEquals(listOf("ringing"), states(ev))
+        assertEquals("Mom", ev[0].name)
+        assertEquals("+15551234", ev[0].number)
+        // same name again -> nothing
+        assertTrue(m.onContactName("Mom").isEmpty())
+    }
+
+    @Test
+    fun idleWhenNothingHappeningEmitsNothing() {
+        val m = CallStateMachine()
+        assertTrue(m.onIdle().isEmpty())
+        assertTrue(m.onOffhook(1L).isNotEmpty()) // outgoing still emits active
     }
 }

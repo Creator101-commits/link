@@ -285,6 +285,84 @@
                         android:textSize="15sp" />
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- Row: Phone access -->
+            <LinearLayout
+                android:id="@+id/layoutPhoneAccessNotice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="64dp"
+                    android:background="@color/separator" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <FrameLayout
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_icon_tile">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="Phone"
+                            android:src="@drawable/sf_phone"
+                            app:tint="@color/secondary_label" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Phone access"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text_semibold"
+                            android:textSize="17sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Shows calls and signal on your Mac"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnEnablePhoneAccess"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@android:color/transparent"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:padding="8dp"
+                        android:text="Enable"
+                        android:textAllCaps="false"
+                        android:letterSpacing="0"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_pro_text_semibold"
+                        android:textSize="15sp" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
 
         <!-- SCREEN A: CONNECTED STATE -->
@@ -1077,6 +1155,46 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checked="true" />
+                </LinearLayout>
+
+                <!-- Skip Silent Notifications -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="4dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Skip silent notifications"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Don't send notifications the phone shows silently"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
+                            android:textSize="12.5sp" />
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchSkipSilent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
                 </LinearLayout>
             </LinearLayout>
 

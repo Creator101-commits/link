@@ -97,6 +97,8 @@ object BridgeNotificationManager {
                 put("androidNotifEnabled", BridgePrefs.isAndroidNotifEnabled(context))
                 put("macNotifEnabled", BridgePrefs.isMacNotifEnabled(context))
                 put("autoAcceptFiles", BridgePrefs.isAutoAcceptFilesEnabled(context))
+                put("skipSilentNotifications", BridgePrefs.isSkipSilentNotificationsEnabled(context))
+                put("appRules", org.json.JSONObject(BridgePrefs.allAppNotificationRules(context)))
                 put("updatedAt", BridgePrefs.getSettingsUpdatedAt(context))
             }
             client.sendRawJson(json.toString())
@@ -280,6 +282,32 @@ object BridgeNotificationManager {
                             json.optBoolean("autoAcceptFiles", true),
                             updateTimestamp = false
                         )
+                    }
+                    if (json.has("skipSilentNotifications")) {
+                        BridgePrefs.setSkipSilentNotificationsEnabled(
+                            context,
+                            json.optBoolean("skipSilentNotifications", false),
+                            updateTimestamp = false
+                        )
+                    }
+                    if (json.has("appRules")) {
+                        val rules = json.optJSONObject("appRules")
+                        if (rules != null) {
+                            val current = BridgePrefs.allAppNotificationRules(context).toMutableMap()
+                            current.clear()
+                            val keys = rules.keys()
+                            while (keys.hasNext()) {
+                                val k = keys.next()
+                                current[k] = rules.optString(k)
+                            }
+                            // Persist via per-key setter path is lossy; write map directly.
+                            val obj = org.json.JSONObject()
+                            current.forEach { (k, v) -> obj.put(k, v) }
+                            context.getSharedPreferences("ClipboardSyncPrefs", android.content.Context.MODE_PRIVATE)
+                                .edit()
+                                .putString("app_notification_rules_json", obj.toString())
+                                .apply()
+                        }
                     }
                     if (remoteUpdatedAt > 0L) {
                         BridgePrefs.setSettingsUpdatedAt(context, remoteUpdatedAt)

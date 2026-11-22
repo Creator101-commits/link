@@ -1,6 +1,7 @@
 package com.link.clipboardsync
 
 import android.app.Notification
+import android.app.NotificationManager
 import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
@@ -95,6 +96,8 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         return false
     }
 
+    private val sentOnceKeys = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         processNotificationPosted(sbn, isFullSync = false)
     }
@@ -136,6 +139,35 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         if (isOngoing && !isCallOrMsg) {
             return
         }
+
+        // Calls are mirrored by BridgeCallMonitor; don't duplicate the dialer's notification.
+        if (category == Notification.CATEGORY_CALL &&
+            (BridgeCallMonitor.isCallInProgress || BridgeCallMonitor.hasPermissions(this))
+        ) {
+            return
+        }
+
+        val ranking = NotificationListenerService.Ranking()
+        val hasRanking = runCatching { currentRanking?.getRanking(rawKey, ranking) == true }.getOrDefault(false)
+        val isAlertOnceUpdate = (notif.flags and Notification.FLAG_ONLY_ALERT_ONCE) != 0 &&
+                sentOnceKeys.contains(normKey)
+        val importance = when {
+            isAlertOnceUpdate -> NotificationManager.IMPORTANCE_LOW
+            hasRanking -> ranking.importance
+            else -> NotificationManager.IMPORTANCE_DEFAULT
+        }
+        val ambient = hasRanking && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ranking.isAmbient
+        if (!NotificationForwardPolicy.shouldForward(
+                level = BridgePrefs.appNotificationRule(this, pkg),
+                importance = importance,
+                ambient = ambient,
+                skipSilent = BridgePrefs.isSkipSilentNotificationsEnabled(this),
+                isCallOrMessage = category == Notification.CATEGORY_CALL || category == Notification.CATEGORY_MESSAGE
+            )
+        ) {
+            return
+        }
+        sentOnceKeys.add(normKey)
 
         val extras = notif.extras ?: Bundle()
         val defaultTitle = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
@@ -415,6 +447,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         if (sbn == null) return
         val rawKey = sbn.key ?: return
         val normKey = normalizeKey(rawKey)
+        sentOnceKeys.remove(normKey)
         val now = System.currentTimeMillis()
         val last = recentRemovals[normKey] ?: 0L
         if (now - last < 400) {

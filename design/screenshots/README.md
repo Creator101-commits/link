@@ -9,6 +9,8 @@ Visual reference captures for the Bridge rebrand (see `../DESIGN.md`). Mac shots
 - `mac-notifications-light.png` / `mac-notifications-dark.png` — notification list with app icons and action/reply buttons
 - `mac-transfers-light.png` / `mac-transfers-dark.png` — transfer list (active ~40%, completed, failed) plus drop zone
 - `mac-settings-light.png` / `mac-settings-dark.png` — settings screen
+- `mac-call-ringing-light.png` / `mac-call-ringing-dark.png` — incoming call card pinned above the tab strip (Mom, Answer/Decline) with phone status
+- `mac-apps-settings-light.png` / `mac-apps-settings-dark.png` — Settings APPS section: per-app notification level pickers
 
 Note: captured via `cacheDisplay` fallback (Screen Recording permission not granted to the capture process), so popover vibrancy/materials render as the window background color rather than live material.
 

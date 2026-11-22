@@ -24,6 +24,8 @@ object BridgePrefs {
     private const val KEY_CUSTOM_SAVE_DISPLAY_NAME = "custom_save_display_name"
     private const val KEY_BT_ID = "mac_bt_id"
     private const val KEY_FAST_LINK_ENABLED = "fast_link_enabled"
+    private const val KEY_SKIP_SILENT_NOTIFICATIONS = "skip_silent_notifications"
+    private const val KEY_APP_NOTIFICATION_RULES = "app_notification_rules_json"
 
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -198,5 +200,41 @@ object BridgePrefs {
 
     fun clear(context: Context) {
         prefs(context).edit().clear().apply()
+    }
+
+    fun isSkipSilentNotificationsEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_SKIP_SILENT_NOTIFICATIONS, false)
+
+    fun setSkipSilentNotificationsEnabled(context: Context, enabled: Boolean, updateTimestamp: Boolean = true) {
+        val editor = prefs(context).edit().putBoolean(KEY_SKIP_SILENT_NOTIFICATIONS, enabled)
+        if (updateTimestamp) editor.putLong(KEY_SETTINGS_UPDATED_AT, System.currentTimeMillis())
+        editor.apply()
+    }
+
+    /** Per-app notification level: "off"|"muted"|"quiet"|"normal"|"high" or null. */
+    fun appNotificationRule(context: Context, pkg: String): String? {
+        val raw = prefs(context).getString(KEY_APP_NOTIFICATION_RULES, null) ?: return null
+        return runCatching {
+            org.json.JSONObject(raw).optString(pkg).ifBlank { null }
+        }.getOrNull()
+    }
+
+    fun setAppNotificationRule(context: Context, pkg: String, level: String?) {
+        val obj = runCatching {
+            org.json.JSONObject(prefs(context).getString(KEY_APP_NOTIFICATION_RULES, null) ?: "{}")
+        }.getOrElse { org.json.JSONObject() }
+        if (level == null || level == "normal") obj.remove(pkg) else obj.put(pkg, level)
+        prefs(context).edit()
+            .putString(KEY_APP_NOTIFICATION_RULES, obj.toString())
+            .putLong(KEY_SETTINGS_UPDATED_AT, System.currentTimeMillis())
+            .apply()
+    }
+
+    fun allAppNotificationRules(context: Context): Map<String, String> {
+        val raw = prefs(context).getString(KEY_APP_NOTIFICATION_RULES, null) ?: return emptyMap()
+        return runCatching {
+            val obj = org.json.JSONObject(raw)
+            obj.keys().asSequence().associateWith { obj.optString(it) }
+        }.getOrElse { emptyMap() }
     }
 }

@@ -1327,6 +1327,17 @@ class BridgeServer {
             return
         }
 
+        if type.hasPrefix("device_") {
+            DispatchQueue.main.async { BridgeDeviceStatus.shared.update(from: jsonObject) }
+            return
+        }
+
+        if type.hasPrefix("call_") {
+            let deviceId = id.uuidString
+            DispatchQueue.main.async { BridgeCallManager.shared.handleIncoming(json: jsonObject, from: deviceId) }
+            return
+        }
+
         if type.hasPrefix("file_") {
             let devName = self.clientDeviceNames[id] ?? "Android Device"
             BridgeFileTransferManager.shared.handleControlMessage(jsonObject, fromDeviceId: id, deviceName: devName)

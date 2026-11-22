@@ -667,6 +667,56 @@ private func runAdaptiveAndIconCacheTests() {
     expect(badParsed.frames.isEmpty, "parseFrames returned frames before corrupt length")
 }
 
+
+private func runPhaseAFeatureTests() {
+    // lowBatteryDecision
+    var r = BridgeDeviceStatus.lowBatteryDecision(level: 19, charging: false, threshold: 20, state: 0)
+    expect(r.alert == 19 && r.newState == 1, "low battery at 19% threshold 20 alerts once")
+    r = BridgeDeviceStatus.lowBatteryDecision(level: 18, charging: false, threshold: 20, state: 1)
+    expect(r.alert == nil && r.newState == 1, "already-alerted discharge does not repeat")
+    r = BridgeDeviceStatus.lowBatteryDecision(level: 5, charging: true, threshold: 20, state: 1)
+    expect(r.alert == nil && r.newState == 0, "charging re-arms the alert")
+    r = BridgeDeviceStatus.lowBatteryDecision(level: 50, charging: false, threshold: 20, state: 0)
+    expect(r.alert == nil, "level above threshold does not alert")
+    r = BridgeDeviceStatus.lowBatteryDecision(level: 10, charging: false, threshold: 30, state: 0)
+    expect(r.alert == 10, "threshold 30 still alerts at 10%")
+    r = BridgeDeviceStatus.lowBatteryDecision(level: 26, charging: false, threshold: 20, state: 1)
+    expect(r.newState == 0, "level 5 above threshold re-arms")
+    r = BridgeDeviceStatus.lowBatteryDecision(level: 20, charging: false, threshold: 0, state: 0)
+    expect(r.alert == nil, "threshold 0 (off) never alerts")
+
+    // settings_sync appRules/skipSilent round-trip
+    let rules = ["com.whatsapp": "high", "com.instagram": "muted"]
+    var json: [String: Any] = [
+        "type": "settings_sync",
+        "skipSilentNotifications": true,
+        "appRules": rules,
+        "updatedAt": 12345
+    ]
+    let skipSilent = json["skipSilentNotifications"] as? Bool
+    let decodedRules = json["appRules"] as? [String: String]
+    expect(skipSilent == true, "skipSilentNotifications decodes")
+    expect(decodedRules == rules, "appRules dict round-trips")
+    json["appRules"] = ["com.gmail": "off"]
+    expect((json["appRules"] as? [String: String])?["com.gmail"] == "off", "appRules updates")
+
+    // appList: union of displayNames + rules, sorted by name, level defaults normal
+    let list = BridgeNotificationManager.appList(
+        displayNames: ["com.whatsapp": "WhatsApp", "com.instagram": "Instagram"],
+        rules: ["com.whatsapp": "high", "com.gmail": "quiet"]
+    )
+    expect(list.count == 3, "appList unions displayNames + rules (got \(list.count))")
+    expect(list.first?.pkg == "com.gmail", "appList sorted by name (gmail first)")
+    let wa = list.first { $0.pkg == "com.whatsapp" }
+    expect(wa?.level == "high" && wa?.name == "WhatsApp", "ruled app keeps level+name")
+    let ig = list.first { $0.pkg == "com.instagram" }
+    expect(ig?.level == "normal", "seen-but-unruled app defaults to normal")
+    let gm = list.first { $0.pkg == "com.gmail" }
+    expect(gm?.name == "com.gmail" && gm?.level == "quiet", "ruled-only app uses pkg as name")
+    // empty
+    expect(BridgeNotificationManager.appList(displayNames: [:], rules: [:]).isEmpty, "appList empty when no apps")
+}
+
 @main
 struct BridgeTestRunner {
     static func main() {
@@ -677,6 +727,7 @@ struct BridgeTestRunner {
         runBluetoothRelayHeaderTests()
         runFastLinkManagerTests()
         runNotificationScrollLayoutTests()
+        runPhaseAFeatureTests()
         runAdaptiveAndIconCacheTests()
         do {
             try runPayloadAndVersionTests()
@@ -693,3 +744,4 @@ struct BridgeTestRunner {
         print("All macOS Bridge unit tests passed!")
     }
 }
+

@@ -137,6 +137,7 @@ struct SectionHeader: View {
 }
 
 struct StatusCapsule: View {
+    @ObservedObject var deviceStatus = BridgeDeviceStatus.shared
     let model: BridgeModel
 
     private var state: (color: Color, text: String) {
@@ -144,7 +145,9 @@ struct StatusCapsule: View {
             let transport = model.isConnectedOverBluetooth
                 ? "Bluetooth"
                 : (BridgeFastLinkManager.shared.stateDescription == "Hotspot" ? "Hotspot" : "Wi-Fi")
-            return (.bridgeGreen, "Connected · \(transport)")
+            let battery = BridgeDeviceStatus.shared.status?.battery
+            let suffix = battery.map { " · \($0)%" } ?? ""
+            return (.bridgeGreen, "Connected · \(transport)\(suffix)")
         } else if model.pairedDevice != nil {
             return (.bridgeOrange, "Waiting for phone")
         } else {
@@ -703,11 +706,17 @@ struct MacSaveLocationRow: View {
 // MARK: - Main Menu Bar View
 
 struct BridgeMenuView: View {
+    /// Snapshot-harness only: render just the Apps settings section.
+    static var snapshotAppsOnly = false
+
     @ObservedObject var model: BridgeModel
     @ObservedObject var notifManager: BridgeNotificationManager = BridgeNotificationManager.shared
     @ObservedObject var fileTransferManager: BridgeFileTransferManager = BridgeFileTransferManager.shared
     @ObservedObject var axObserver: AXNotificationObserver = AXNotificationObserver.shared
     @ObservedObject var fastLinkManager: BridgeFastLinkManager = BridgeFastLinkManager.shared
+    @ObservedObject var deviceStatus: BridgeDeviceStatus = BridgeDeviceStatus.shared
+    @ObservedObject var callManager: BridgeCallManager = BridgeCallManager.shared
+    @State private var expandedNotifApps: Set<String> = []
 
     private var isPairedOrConnected: Bool {
         model.isConnected || model.pairedDevice != nil || !model.connectedDevicesList.isEmpty
@@ -724,6 +733,9 @@ struct BridgeMenuView: View {
     var body: some View {
         VStack(spacing: 10) {
             header
+            if let call = callManager.currentCall {
+                callCard(call)
+            }
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 10) {
                     if isPairedOrConnected {
@@ -759,11 +771,8 @@ struct BridgeMenuView: View {
 
     private var header: some View {
         HStack {
-            Spacer()
             LinkGlyphView(size: 26)
-            Spacer()
-        }
-        .overlay(alignment: .trailing) {
+            Spacer(minLength: 8)
             StatusCapsule(model: model)
         }
         .padding(.top, 14)
@@ -878,6 +887,7 @@ struct BridgeMenuView: View {
             unpairConfirmationCard
         } else {
             VStack(spacing: 8) {
+                phoneStatusCard
                 // Devices: This Mac + phones in ONE grouped card with hairlines
                 BridgeCard {
                     VStack(spacing: 0) {
@@ -1186,11 +1196,135 @@ struct BridgeMenuView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Per-app notification stacks
+
+    private struct AppStack: Identifiable {
+        let pkg: String
+        let name: String
+        let level: String
+        let notifs: [BridgeNotification]   // newest first
+        var id: String { pkg }
+        var newestTimestamp: Int64 { notifs.first?.timestamp ?? 0 }
+    }
+
+    /// Group active notifications by package; "high" apps sort first, the rest
+    /// by newest notification timestamp.
+    private var appStacks: [AppStack] {
+        var groups: [String: [BridgeNotification]] = [:]
+        for n in notifManager.activeNotifications {
+            let key = n.pkg ?? (n.app ?? "notifications")
+            groups[key, default: []].append(n)
+        }
+        let stacks = groups.map { (key, notifs) -> AppStack in
+            let isRuled = notifManager.appRules[key] != nil
+            let name = isRuled || notifManager.appDisplayNames[key] != nil
+                ? notifManager.appDisplayName(for: key)
+                : (notifs.first?.app ?? key)
+            return AppStack(pkg: key, name: name,
+                            level: notifManager.appRules[key] ?? "normal",
+                            notifs: notifs)
+        }
+        return stacks.sorted { a, b in
+            let aHigh = a.level == "high" ? 1 : 0
+            let bHigh = b.level == "high" ? 1 : 0
+            if aHigh != bHigh { return aHigh > bHigh }
+            return a.newestTimestamp > b.newestTimestamp
+        }
+    }
+
     private var notificationCardsList: some View {
         VStack(spacing: 8) {
-            ForEach(notifManager.activeNotifications) { notif in
+            ForEach(appStacks) { stack in
+                appNotificationStack(stack)
+            }
+        }
+    }
+
+    private func appNotificationStack(_ stack: AppStack) -> some View {
+        let expanded = expandedNotifApps.contains(stack.pkg)
+        let visible = expanded ? stack.notifs : Array(stack.notifs.prefix(1))
+        return VStack(alignment: .leading, spacing: 6) {
+            // App header: icon + name + count + level menu
+            HStack(spacing: 8) {
+                appStackIcon(stack.pkg)
+                Text(stack.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Text("\(stack.notifs.count)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                appLevelMenu(stack.pkg, current: stack.level)
+            }
+            .padding(.horizontal, 2)
+
+            ForEach(visible) { notif in
                 NotificationCardView(notification: notif, manager: notifManager)
             }
+
+            if stack.notifs.count > 1 {
+                Button {
+                    if expanded {
+                        expandedNotifApps.remove(stack.pkg)
+                    } else {
+                        expandedNotifApps.insert(stack.pkg)
+                    }
+                } label: {
+                    Text(expanded ? "Show less" : "\(stack.notifs.count - 1) more")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 2)
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.03)))
+    }
+
+    private func appStackIcon(_ pkg: String) -> some View {
+        Group {
+            if let img = BridgeAppIconCache.shared.image(pkg: pkg) {
+                Image(nsImage: img).resizable().aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: "app.fill").foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 20, height: 20)
+    }
+
+    private func appLevelMenu(_ pkg: String, current: String) -> some View {
+        Menu {
+            ForEach(["high", "normal", "quiet", "muted", "off"], id: \.self) { lvl in
+                Button {
+                    notifManager.setAppRule(pkg, level: lvl)
+                } label: {
+                    if lvl == current {
+                        Label(levelTitle(lvl), systemImage: "checkmark")
+                    } else {
+                        Text(levelTitle(lvl))
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+    }
+
+    private func levelTitle(_ lvl: String) -> String {
+        switch lvl {
+        case "high": return "High"
+        case "quiet": return "Quiet"
+        case "muted": return "Muted"
+        case "off": return "Off"
+        default: return "Normal"
         }
     }
 
@@ -1327,7 +1461,38 @@ struct BridgeMenuView: View {
     // MARK: Settings
 
     @ViewBuilder
+    private var appsSettingsSection: some View {
+        settingsSection(title: "Apps") {
+            BridgeCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    let apps = BridgeNotificationManager.appList(
+                        displayNames: notifManager.appDisplayNames,
+                        rules: notifManager.appRules
+                    )
+                    ForEach(Array(apps.enumerated()), id: \.element.pkg) { idx, app in
+                        appRuleRow(pkg: app.pkg, level: app.level)
+                        if idx != apps.count - 1 {
+                            Divider().overlay(Color.bridgeSeparator.opacity(0.5))
+                        }
+                    }
+                    if apps.isEmpty {
+                        Text("Apps appear here after they send a notification.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private var settingsContent: some View {
+        if Self.snapshotAppsOnly {
+            VStack(alignment: .leading, spacing: 14) {
+                appsSettingsSection
+            }
+        } else {
         VStack(alignment: .leading, spacing: 14) {
                 settingsSection(title: "Notifications") {
                     BridgeCard {
@@ -1366,9 +1531,25 @@ struct BridgeMenuView: View {
                                 isOn: $notifManager.isSoundEnabled,
                                 disabled: !notifManager.isEffectiveAndroidReceiveEnabled
                             )
+                            Divider().overlay(Color.bridgeSeparator.opacity(0.5))
+                            settingsToggleRow(
+                                title: "Skip Silent Notifications",
+                                subtitle: "Don't forward notifications that don't alert on the phone.",
+                                isOn: $notifManager.isSkipSilentEnabled
+                            )
                         }
                     }
                 }
+
+                settingsSection(title: "Phone") {
+                    BridgeCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            lowBatterySettingsRow
+                        }
+                    }
+                }
+
+                appsSettingsSection
 
                 settingsSection(title: "Transfers") {
                     BridgeCard {
@@ -1465,6 +1646,184 @@ struct BridgeMenuView: View {
                 }
             }
             .padding(.bottom, 4)
+        }
+    }
+
+    // MARK: - Phone status card
+
+    private var phoneStatusCard: some View {
+        let st = deviceStatus.status
+        return Group {
+            if let st = st {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        batteryIcon(for: st)
+                            .font(.system(size: 26))
+                            .foregroundStyle(.primary)
+                            .frame(width: 34)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text("\(st.battery ?? 0)%")
+                                    .font(.system(size: 17, weight: .semibold))
+                                if st.charging == true {
+                                    Text("Charging")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            if let carrier = st.carrier, !carrier.isEmpty {
+                                Text(carrier)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        HStack(spacing: 6) {
+                            if let network = st.network, !network.isEmpty {
+                                Text(network)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let signal = st.signal {
+                                Image(systemName: "cellularbars", variableValue: Double(signal) / 4.0)
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(.secondary)
+                                    .font(.system(size: 18))
+                            }
+                        }
+                    }
+                    if st.noService == true {
+                        Label("No service", systemImage: "antenna.radiowaves.left.and.right.slash")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.orange)
+                    }
+                    if st.airplane == true {
+                        Label("Airplane mode", systemImage: "airplane")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .padding(14)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+
+    private func batteryIcon(for st: BridgeDeviceStatus.Status) -> some View {
+        let level = st.battery ?? 0
+        let name: String
+        if st.charging == true {
+            name = "battery.100.bolt"
+        } else if level >= 90 { name = "battery.100" }
+        else if level >= 65 { name = "battery.75" }
+        else if level >= 40 { name = "battery.50" }
+        else if level >= 15 { name = "battery.25" }
+        else { name = "battery.0" }
+        return Image(systemName: name)
+    }
+
+    // MARK: - Call card
+
+    private func callCard(_ call: BridgeCallManager.CallInfo) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "person.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Color.accentColor.opacity(0.85), in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(call.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                if call.state == .active {
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        Text("On phone · \(BridgeCallManager.formatElapsed(BridgeCallManager.elapsedSeconds(since: call.startedAt)))")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(call.number.isEmpty ? call.direction.capitalized : "\(call.number) · \(call.direction)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            if call.state == .ringing {
+                callActionButton(icon: "phone.down.fill", color: .red) { callManager.declineCall() }
+                callActionButton(icon: "phone.fill", color: .green) { callManager.answerCall() }
+            } else {
+                callActionButton(icon: "phone.down.fill", color: .red) { callManager.endCall() }
+            }
+        }
+        .padding(10)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func callActionButton(icon: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(color, in: Circle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func appRuleRow(pkg: String, level: String) -> some View {
+        HStack(spacing: 10) {
+            if let icon = BridgeAppIconCache.shared.image(pkg: pkg) {
+                Image(nsImage: icon)
+                    .resizable().aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+            } else {
+                Image(systemName: "app.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(notifManager.appDisplayName(for: pkg))
+                    .font(.system(size: 13, weight: .medium))
+                Text(pkg)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+            Picker("", selection: Binding(
+                get: { level },
+                set: { notifManager.setAppRule(pkg, level: $0) }
+            )) {
+                Text("High").tag("high")
+                Text("Normal").tag("normal")
+                Text("Quiet").tag("quiet")
+                Text("Muted").tag("muted")
+                Text("Off").tag("off")
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var lowBatterySettingsRow: some View {
+        HStack {
+            Text("Low battery alert")
+                .font(.system(size: 13))
+            Spacer()
+            Picker("", selection: Binding(
+                get: { UserDefaults.standard.integer(forKey: "lowBatteryThreshold") },
+                set: { UserDefaults.standard.set($0, forKey: "lowBatteryThreshold") }
+            )) {
+                Text("Off").tag(0)
+                Text("10%").tag(10)
+                Text("20%").tag(20)
+                Text("30%").tag(30)
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+        }
     }
 
     private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {

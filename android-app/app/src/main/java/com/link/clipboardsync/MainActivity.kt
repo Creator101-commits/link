@@ -77,6 +77,10 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private lateinit var layoutNotificationNotice: LinearLayout
     private lateinit var btnEnableNotificationAccess: Button
 
+    // Phone access notice (calls + signal on Mac)
+    private lateinit var layoutPhoneAccessNotice: LinearLayout
+    private lateinit var btnEnablePhoneAccess: Button
+
     // Screen A: Connected + Bottom Nav Tabs
     private lateinit var layoutScreenConnected: LinearLayout
     private lateinit var layoutTabBridge: LinearLayout
@@ -131,6 +135,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private lateinit var switchPhoneVibrate: SwitchCompat
     private lateinit var switchAutoAcceptFiles: SwitchCompat
     private lateinit var switchFastLink: SwitchCompat
+    private lateinit var switchSkipSilent: SwitchCompat
     private lateinit var rowSaveLocation: LinearLayout
     private lateinit var tvSaveLocationPath: TextView
     private lateinit var btnResetSaveLocation: TextView
@@ -384,6 +389,10 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         layoutNotificationNotice = findViewById(R.id.layoutNotificationNotice)
         btnEnableNotificationAccess = findViewById(R.id.btnEnableNotificationAccess)
 
+        // Phone access notice
+        layoutPhoneAccessNotice = findViewById(R.id.layoutPhoneAccessNotice)
+        btnEnablePhoneAccess = findViewById(R.id.btnEnablePhoneAccess)
+
         // Screen A & Bottom Nav Tabs
         layoutScreenConnected = findViewById(R.id.layoutScreenConnected)
         layoutTabBridge = findViewById(R.id.layoutTabBridge)
@@ -442,6 +451,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         btnChangeSaveLocation = findViewById(R.id.btnChangeSaveLocation)
         switchAutoAcceptFiles = findViewById(R.id.switchAutoAcceptFiles)
         switchFastLink = findViewById(R.id.switchFastLink)
+        switchSkipSilent = findViewById(R.id.switchSkipSilent)
         rowSettingNotifAccess = findViewById(R.id.rowSettingNotifAccess)
         tvSettingNotifAccessStatus = findViewById(R.id.tvSettingNotifAccessStatus)
         rowSettingAccessibility = findViewById(R.id.rowSettingAccessibility)
@@ -457,6 +467,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         styleBridgeSwitch(switchPhoneVibrate)
         styleBridgeSwitch(switchAutoAcceptFiles)
         styleBridgeSwitch(switchFastLink)
+        styleBridgeSwitch(switchSkipSilent)
 
         // Screen B
         layoutScreenPairing = findViewById(R.id.layoutScreenPairing)
@@ -662,6 +673,10 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
 
+        btnEnablePhoneAccess.setOnClickListener {
+            requestPhonePermissions()
+        }
+
         rowSettingNotifAccess.setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
@@ -752,6 +767,13 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 BridgeFastLink.clearFailureCooldown()
                 ensureBluetoothPermissions()
             }
+        }
+
+        switchSkipSilent.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingSettingsUi) return@setOnCheckedChangeListener
+            BridgePrefs.setSkipSilentNotificationsEnabled(this, isChecked, updateTimestamp = true)
+            BridgeNotificationManager.sendSettingsToMac(this)
+            updateSettingsUI()
         }
 
         btnScanQr.setOnClickListener {
@@ -1020,7 +1042,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         layoutFinishSetupCard.visibility =
             if (layoutSetupProgress.visibility == View.VISIBLE ||
                 layoutServiceNotice.visibility == View.VISIBLE ||
-                layoutNotificationNotice.visibility == View.VISIBLE
+                layoutNotificationNotice.visibility == View.VISIBLE ||
+                layoutPhoneAccessNotice.visibility == View.VISIBLE
             ) View.VISIBLE else View.GONE
     }
 
@@ -1032,12 +1055,14 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
 
         var completed = if (uiPaired()) 1 else 0
-        val total = 3
+        val total = 4
         val acc = isAccessibilityServiceEnabled()
         val notif = isNotificationServiceEnabled()
+        val phone = hasPhonePermissionForSetup()
 
         if (acc) completed++
         if (notif) completed++
+        if (phone) completed++
 
         if (completed == total) {
             layoutSetupProgress.visibility = View.GONE
@@ -1045,8 +1070,11 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             val percent = (completed * 100) / total
             tvSetupProgressStatus.text = "$completed of $total completed · $percent%"
             val missing = when {
+                !acc && !notif && !phone -> "Enable Notification Access, Background Clipboard Service, and Phone access for full sync."
                 !acc && !notif -> "Enable Notification Access and Background Clipboard Service for full sync."
                 !acc -> "Enable Background Clipboard Service to keep clipboard synced automatically."
+                !notif -> "Enable Notification Access to mirror notifications to your Mac."
+                !phone -> "Enable Phone access to show calls and signal on your Mac."
                 else -> "Enable Notification Access to mirror notifications to your Mac."
             }
             tvSetupProgressDetail.text = missing
@@ -1067,6 +1095,12 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         } else {
             layoutNotificationNotice.visibility = View.VISIBLE
         }
+
+        if (currentTab != TAB_HOME || hasPhonePermissionForSetup()) {
+            layoutPhoneAccessNotice.visibility = View.GONE
+        } else {
+            layoutPhoneAccessNotice.visibility = View.VISIBLE
+        }
         refreshFinishSetupCard()
     }
 
@@ -1085,6 +1119,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             switchPhoneVibrate.isChecked = vibrateEnabled
             switchAutoAcceptFiles.isChecked = autoAcceptFiles
             switchFastLink.isChecked = BridgePrefs.isFastLinkEnabled(this)
+            switchSkipSilent.isChecked = BridgePrefs.isSkipSilentNotificationsEnabled(this)
 
             switchAndroidNotif.isEnabled = masterEnabled
             switchMacNotif.isEnabled = masterEnabled
@@ -1538,6 +1573,13 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
     }
 
+    private fun hasPhonePermissionForSetup(): Boolean {
+        // Demo mode always shows the row as not granted for screenshots.
+        if (demoMode) return false
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) ==
+                PackageManager.PERMISSION_GRANTED
+    }
+
     private fun isNotificationServiceEnabled(): Boolean {
         val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: return false
         val expected = "${packageName}/${BridgeNotificationListenerService::class.java.canonicalName}"
@@ -1933,6 +1975,33 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         } else {
             "Couldn't reach your Mac. Make sure Bluetooth is on (or both are on the same Wi-Fi) and Bridge is open on your Mac."
         }
+
+    private fun requestPhonePermissions() {
+        val perms = arrayOf(
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.ANSWER_PHONE_CALLS
+        )
+        val needed = perms.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }.toTypedArray()
+        if (needed.isNotEmpty()) {
+            requestPermissions(needed, 4101)
+        } else {
+            BridgeDeviceStatus.refresh(this)
+            BridgeCallMonitor.refresh(this)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 4101) {
+            BridgeDeviceStatus.refresh(this)
+            BridgeCallMonitor.refresh(this)
+            refreshFinishSetupCard()
+        }
+    }
 
     private fun checkPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

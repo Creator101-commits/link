@@ -15,7 +15,7 @@ MACOS_MIN ?= 13.0
 ARCH ?= $(shell uname -m)
 SWIFT_TARGET = -target $(ARCH)-apple-macosx$(MACOS_MIN)
 
-SWIFT_SOURCES = Sources/main.swift Sources/BridgeNotificationModels.swift Sources/BridgeFileTransferModels.swift Sources/AXNotificationObserver.swift Sources/BridgeNotificationManager.swift Sources/BridgeFileTransferManager.swift Sources/BridgeServer.swift Sources/BridgeBluetoothRelay.swift Sources/BridgeFastLinkManager.swift Sources/BridgeModel.swift Sources/BridgeMenuView.swift
+SWIFT_SOURCES = Sources/main.swift Sources/BridgeNotificationModels.swift Sources/BridgeFileTransferModels.swift Sources/AXNotificationObserver.swift Sources/BridgeNotificationManager.swift Sources/BridgeFileTransferManager.swift Sources/BridgeServer.swift Sources/BridgeBluetoothRelay.swift Sources/BridgeFastLinkManager.swift Sources/BridgeModel.swift Sources/BridgeMenuView.swift Sources/BridgeDeviceStatus.swift Sources/BridgeCallManager.swift
 
 all: $(APP_NAME)
 
@@ -87,7 +87,7 @@ clean:
 .PHONY: test
 test:
 	@mkdir -p .build-tests
-	swiftc Tests/BridgeTests.swift Sources/BridgeNotificationModels.swift Sources/BridgeFileTransferModels.swift Sources/AXNotificationObserver.swift Sources/BridgeNotificationManager.swift Sources/BridgeFileTransferManager.swift Sources/BridgeServer.swift Sources/BridgeBluetoothRelay.swift Sources/BridgeFastLinkManager.swift Sources/BridgeModel.swift Sources/BridgeMenuView.swift -o .build-tests/BridgeTests -framework AppKit -framework SwiftUI -framework Network -framework CryptoKit -framework CoreImage -framework CoreText -framework UserNotifications -framework ApplicationServices -framework UniformTypeIdentifiers -framework CoreBluetooth -framework CoreWLAN -framework CoreLocation $(SWIFT_TARGET)
+	swiftc Tests/BridgeTests.swift Sources/BridgeNotificationModels.swift Sources/BridgeFileTransferModels.swift Sources/AXNotificationObserver.swift Sources/BridgeNotificationManager.swift Sources/BridgeFileTransferManager.swift Sources/BridgeServer.swift Sources/BridgeBluetoothRelay.swift Sources/BridgeFastLinkManager.swift Sources/BridgeModel.swift Sources/BridgeMenuView.swift Sources/BridgeDeviceStatus.swift Sources/BridgeCallManager.swift -o .build-tests/BridgeTests -framework AppKit -framework SwiftUI -framework Network -framework CryptoKit -framework CoreImage -framework CoreText -framework UserNotifications -framework ApplicationServices -framework UniformTypeIdentifiers -framework CoreBluetooth -framework CoreWLAN -framework CoreLocation $(SWIFT_TARGET)
 	@.build-tests/BridgeTests
 	@rm -rf .build-tests
 
@@ -96,7 +96,7 @@ test:
 SNAPSHOT_SOURCES = $(filter-out Sources/main.swift,$(SWIFT_SOURCES)) scripts/snapshot/main.swift
 SNAPSHOT_BIN = .build-snapshot/BridgeSnapshot
 SNAPSHOT_DIR = ../design/screenshots
-SNAPSHOT_SCREENS = not-paired devices notifications transfers settings
+SNAPSHOT_SCREENS = not-paired devices notifications transfers settings call-ringing apps-settings
 SNAPSHOT_MODES = light dark
 
 snapshots: $(SNAPSHOT_BIN)

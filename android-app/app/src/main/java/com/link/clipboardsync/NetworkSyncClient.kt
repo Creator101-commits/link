@@ -732,6 +732,11 @@ class NetworkSyncClient(private val context: Context) {
 
                                 if (innerType != null && innerType.startsWith("fastlink_") && innerObj != null) {
                                     BridgeFastLink.handleControlMessage(context, innerObj)
+                                } else if (innerType != null && innerType.startsWith("device_")) {
+                                    // Phone-originated device status is not expected inbound;
+                                    // reserved prefix for symmetry with the Mac router.
+                                } else if (innerType != null && innerType.startsWith("call_")) {
+                                    BridgeCallMonitor.handleControlMessage(context, innerObj)
                                 } else if (innerType != null && (innerType.startsWith("notif_") || innerType == "settings_sync")) {
                                     notifyNotificationPayloadReceived(decryptedJsonString)
                                 } else if (innerType != null && innerType.startsWith("file_") && innerObj != null) {

@@ -32,6 +32,7 @@ case "not-paired":
     model.connectedDevicesList = []
     model.selectedTab = .devices
 case "devices":
+    MainActor.assumeIsolated { injectPhaseAState() }
     model.pairedDevice = "Pixel 8"
     model.connectedDevice = "Pixel 8"
     model.isConnected = true
@@ -45,6 +46,7 @@ case "notifications":
     model.connectedDevice = "Pixel 8"
     model.isConnected = true
     model.selectedTab = .notifications
+    MainActor.assumeIsolated { injectPhaseAApps() }
     injectSampleNotifications()
 case "transfers":
     model.pairedDevice = "Pixel 8"
@@ -67,6 +69,30 @@ case "settings":
     notifManager.isSoundEnabled = true
     fileManager.autoAcceptIncomingFiles = true
     BridgeFastLinkManager.shared.isFastLinkEnabled = true
+    MainActor.assumeIsolated { injectPhaseAApps() }
+case "apps-settings":
+    model.pairedDevice = "Pixel 8"
+    model.connectedDevice = "Pixel 8"
+    model.isConnected = true
+    model.selectedTab = .settings
+    BridgeMenuView.snapshotAppsOnly = true
+    MainActor.assumeIsolated { injectPhaseAApps() }
+case "call-ringing":
+    model.pairedDevice = "Pixel 8"
+    model.connectedDevice = "Pixel 8"
+    model.isConnected = true
+    model.selectedTab = .devices
+    MainActor.assumeIsolated {
+        injectPhaseAApps()
+        BridgeDeviceStatus.shared.update(from: [
+            "battery": 72, "charging": true, "plug": "usb",
+            "network": "5G", "signal": 3, "carrier": "Jio", "name": "Pixel 8",
+        ])
+        BridgeCallManager.shared.currentCall = BridgeCallManager.CallInfo(
+            state: .ringing, name: "Mom", number: "+91 98765 43210",
+            direction: "incoming", startedAt: nil
+        )
+    }
 default:
     FileHandle.standardError.write("unknown screen: \(screen)\n".data(using: .utf8)!)
     exit(2)
@@ -101,32 +127,78 @@ func injectSampleNotifications() {
     let icons: [(String, String, String, (CGFloat, CGFloat, CGFloat))] = [
         ("com.whatsapp", "WhatsApp", "W", (0.18, 0.72, 0.29)),
         ("com.instagram.android", "Instagram", "I", (0.55, 0.25, 0.75)),
-        ("com.spotify.music", "Spotify", "S", (0.05, 0.65, 0.30)),
+        ("com.google.android.gm", "Gmail", "G", (0.20, 0.40, 0.80)),
+        ("com.mobilityware.solitaire", "Games", "G", (0.60, 0.30, 0.20)),
     ]
     for (pkg, app, letter, rgb) in icons {
         cache.store(pkg: pkg, base64: sampleIcon(letter, rgb))
     }
     let now = Int64(Date().timeIntervalSince1970 * 1000)
     notifManager.activeNotifications = [
+        // WhatsApp x3 (newest first) — one carries a reply action.
         BridgeNotification(
-            id: "snap-1", source: "android", pkg: "com.whatsapp", app: "WhatsApp",
-            title: "Family Group", text: "Mom: Dinner at 7?",
-            timestamp: now - 60_000,
+            id: "snap-wa-1", source: "android", pkg: "com.whatsapp", app: "WhatsApp",
+            title: "Family Group", text: "Dad: Call me when free",
+            timestamp: now - 30_000,
             actions: [
                 BridgeNotificationAction(id: 0, title: "Reply", hasInput: true, placeholder: "Reply"),
                 BridgeNotificationAction(id: 1, title: "Mark as read"),
             ]
         ),
         BridgeNotification(
-            id: "snap-2", source: "android", pkg: "com.instagram.android", app: "Instagram",
+            id: "snap-wa-2", source: "android", pkg: "com.whatsapp", app: "WhatsApp",
+            title: "Mom", text: "On my way",
+            timestamp: now - 4 * 60_000
+        ),
+        BridgeNotification(
+            id: "snap-wa-3", source: "android", pkg: "com.whatsapp", app: "WhatsApp",
+            title: "Weekend Plans", text: "Sarah: Saturday works for me",
+            timestamp: now - 9 * 60_000
+        ),
+        // Instagram x1
+        BridgeNotification(
+            id: "snap-ig-1", source: "android", pkg: "com.instagram.android", app: "Instagram",
             title: "alex.k", text: "Liked your photo: \"Sunset hike\"",
             timestamp: now - 12 * 60_000
         ),
+        // Gmail x2
         BridgeNotification(
-            id: "snap-3", source: "android", pkg: "com.spotify.music", app: "Spotify",
-            title: "Daily Mix 3", text: "New releases from artists you follow",
-            timestamp: now - 45 * 60_000
+            id: "snap-gm-1", source: "android", pkg: "com.google.android.gm", app: "Gmail",
+            title: "GitHub", text: "[bridgeoffline] PR #42 merged",
+            timestamp: now - 20 * 60_000
         ),
+        BridgeNotification(
+            id: "snap-gm-2", source: "android", pkg: "com.google.android.gm", app: "Gmail",
+            title: "Receipts", text: "Your order has shipped",
+            timestamp: now - 50 * 60_000
+        ),
+    ]
+}
+
+/// Shared Phase-A sample state: phone status, app rules, display names.
+@MainActor
+func injectPhaseAState() {
+    BridgeDeviceStatus.shared.update(from: [
+        "battery": 72, "charging": true, "plug": "usb",
+        "network": "5G", "signal": 3, "carrier": "Jio", "name": "Pixel 8",
+    ])
+}
+
+/// App rules + display names for the APPS settings section and stacks.
+@MainActor
+func injectPhaseAApps() {
+    injectPhaseAState()
+    notifManager.appDisplayNames = [
+        "com.whatsapp": "WhatsApp",
+        "com.instagram.android": "Instagram",
+        "com.google.android.gm": "Gmail",
+        "com.mobilityware.solitaire": "Games",
+    ]
+    notifManager.appRules = [
+        "com.whatsapp": "high",
+        "com.google.android.gm": "quiet",
+        "com.mobilityware.solitaire": "off",
+        // Instagram stays normal (no rule)
     ]
 }
 

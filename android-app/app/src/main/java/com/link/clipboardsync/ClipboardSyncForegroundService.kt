@@ -67,6 +67,8 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
         ClipboardSyncManager.init(this)
         ClipboardSyncManager.networkClient?.addListener(this)
         BridgeNotificationManager.init(this)
+        BridgeDeviceStatus.start(this)
+        BridgeCallMonitor.start(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -126,6 +128,7 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
     }
 
     override fun onConnectionStatusChanged(isConnected: Boolean, host: String?) {
+        if (isConnected) BridgeDeviceStatus.onLinkReady() else BridgeDeviceStatus.onLinkLost()
         mainHandler.post {
             val name = BridgePrefs.macName(this) ?: "Mac"
             val isActivelyConnecting = ClipboardSyncManager.networkClient?.isActivelyConnecting() == true
@@ -235,5 +238,7 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
         super.onDestroy()
         isRunning = false
         ClipboardSyncManager.networkClient?.removeListener(this)
+        BridgeDeviceStatus.stop()
+        BridgeCallMonitor.stop()
     }
 }

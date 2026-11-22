@@ -31,6 +31,7 @@ let symbols: [(file: String, symbol: String?)] = [
     ("sf_arrow_up_right", "arrow.up.right"), ("sf_arrow_down_left", "arrow.down.left"),
     ("sf_magnifyingglass", "magnifyingglass"), ("sf_exclamation", "exclamationmark.circle.fill"),
     ("sf_power", "power"), ("sf_link_badge", "link.badge.plus"),
+    ("sf_phone", "phone"),
 ]
 
 // density -> pixels for a 24dp icon

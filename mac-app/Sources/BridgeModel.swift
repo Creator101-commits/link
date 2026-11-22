@@ -107,6 +107,11 @@ class BridgeModel: ObservableObject {
     private func setupServerCallbacks() {
         // Assigned once: the observer reads current connection state lazily.
         AXNotificationObserver.shared.shouldScan = { [weak self] in self?.isConnected == true }
+        Task { @MainActor in
+            BridgeCallManager.shared.sendJsonHandler = { [weak self] json in
+                self?.server.broadcastRawJson(json)
+            }
+        }
         server.onStatusChanged = { [weak self] connected, device in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -118,6 +123,10 @@ class BridgeModel: ObservableObject {
                         UserDefaults.standard.set(dev, forKey: BridgeModel.keyPairedDevice)
                     }
                     self.showPairingSection = false
+                } else {
+                    // Last client gone — drop phone status + any live call card.
+                    BridgeDeviceStatus.shared.clear()
+                    BridgeCallManager.shared.currentCall = nil
                 }
                 self.onSizeChangeRequested?()
             }

@@ -13,6 +13,16 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
     // Shared Synced Notification Settings (Master + Sub-options)
     private var isApplyingRemoteSettings: Bool = false
 
+    @Published public var isSkipSilentEnabled: Bool {
+        didSet { UserDefaults.standard.set(isSkipSilentEnabled, forKey: "skipSilentNotifications") }
+    }
+    @Published public var appRules: [String: String] {
+        didSet { persistAppRules() }
+    }
+    @Published public var appDisplayNames: [String: String] {
+        didSet { persistAppDisplayNames() }
+    }
+
     @Published public var isMasterNotificationsEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isMasterNotificationsEnabled, forKey: "bridge_notif_master_enabled")
@@ -72,6 +82,15 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
 
     private override init() {
         self.isMasterNotificationsEnabled = UserDefaults.standard.object(forKey: "bridge_notif_master_enabled") as? Bool ?? true
+        self.isSkipSilentEnabled = UserDefaults.standard.bool(forKey: "skipSilentNotifications")
+        if let data = UserDefaults.standard.data(forKey: "appNotificationRules"),
+           let dict = try? JSONDecoder().decode([String: String].self, from: data) {
+            self.appRules = dict
+        } else { self.appRules = [:] }
+        if let data = UserDefaults.standard.data(forKey: "appDisplayNames"),
+           let dict = try? JSONDecoder().decode([String: String].self, from: data) {
+            self.appDisplayNames = dict
+        } else { self.appDisplayNames = [:] }
         self.isMirroringEnabled = UserDefaults.standard.object(forKey: "bridge_notif_mirroring_enabled") as? Bool ?? true
         self.isSoundEnabled = UserDefaults.standard.object(forKey: "bridge_notif_sound_enabled") as? Bool ?? true
         self.isMacAlertsForwardingEnabled = UserDefaults.standard.object(forKey: "bridge_mac_alerts_forwarding") as? Bool ?? true
@@ -102,6 +121,8 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             "androidNotifEnabled": isMirroringEnabled,
             "macNotifEnabled": isMacAlertsForwardingEnabled,
             "autoAcceptFiles": BridgeFileTransferManager.shared.autoAcceptIncomingFiles,
+            "skipSilentNotifications": isSkipSilentEnabled,
+            "appRules": appRules,
             "updatedAt": settingsUpdatedAt
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
@@ -242,6 +263,12 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         }
         if let macEnabled = json["macNotifEnabled"] as? Bool {
             self.isMacAlertsForwardingEnabled = macEnabled
+        }
+        if let skipSilent = json["skipSilentNotifications"] as? Bool {
+            isSkipSilentEnabled = skipSilent
+        }
+        if let rules = json["appRules"] as? [String: String] {
+            appRules = rules
         }
         if let autoAccept = json["autoAcceptFiles"] as? Bool {
             BridgeFileTransferManager.shared.isApplyingRemoteSettings = true
@@ -408,12 +435,29 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
 
         let formatted = Self.formatBannerContent(for: notif, previousNotif: previousNotif)
 
+        // Per-app level: muted = popover only (no banner), quiet = passive
+        // interruption, high = active + top sort, normal = current behaviour.
+        let level = notif.pkg.flatMap { appRules[$0] } ?? "normal"
+
+        // Record the app display name for the Apps settings section.
+        if let pkg = notif.pkg, let app = notif.app, !app.isEmpty {
+            noteAppName(pkg: pkg, name: app)
+        }
+
         let content = UNMutableNotificationContent()
         content.title = notif.app ?? "Phone Notification"
         content.subtitle = formatted.subtitle
         content.body = formatted.body
-        content.sound = isSoundEnabled ? .default : nil
-        content.threadIdentifier = extractBaseId(notif.id)
+        content.sound = (isSoundEnabled && level != "muted" && level != "quiet") ? .default : nil
+        content.threadIdentifier = notif.pkg ?? extractBaseId(notif.id)
+        if let pkg = notif.pkg {
+            content.summaryArgument = notif.app ?? pkg
+        }
+        switch level {
+        case "quiet": content.interruptionLevel = .passive
+        case "high": content.interruptionLevel = .active
+        default: content.interruptionLevel = .active
+        }
         content.userInfo = ["notif_id": notif.id]
 
         // Show the phone app's own icon as a notification attachment
@@ -454,6 +498,10 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             }
         }
 
+        if level == "muted" {
+            // Muted: keep in the popover list only — no banner, no sound.
+            return
+        }
         let categoryId = "cat_\(notif.id)"
         let category = UNNotificationCategory(
             identifier: categoryId,
@@ -725,6 +773,16 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             return
         }
 
+        if reqId == "incoming-call" {
+            if response.actionIdentifier == "call_answer" {
+                Task { @MainActor in BridgeCallManager.shared.answerCall() }
+            } else if response.actionIdentifier == "call_decline" {
+                Task { @MainActor in BridgeCallManager.shared.declineCall() }
+            }
+            completionHandler()
+            return
+        }
+
         let notifId = (response.notification.request.content.userInfo["notif_id"] as? String)
             ?? response.notification.request.identifier
 
@@ -755,5 +813,57 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         } else {
             completionHandler([.alert, .sound])
         }
+    }
+
+    /// Union of seen apps (displayNames) and apps with a rule, sorted by name.
+    /// Pure — unit-tested. level defaults to "normal" when no rule is set.
+    static func appList(
+        displayNames: [String: String],
+        rules: [String: String]
+    ) -> [(pkg: String, name: String, level: String)] {
+        let allPkgs = Set(displayNames.keys).union(rules.keys)
+        return allPkgs.map { pkg in
+            (pkg: pkg,
+             name: displayNames[pkg] ?? pkg,
+             level: rules[pkg] ?? "normal")
+        }.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    func appDisplayName(for pkg: String) -> String {
+        appDisplayNames[pkg] ?? pkg
+    }
+
+    func setAppRule(_ pkg: String, level: String) {
+        var rules = appRules
+        if level == "normal" { rules.removeValue(forKey: pkg) } else { rules[pkg] = level }
+        appRules = rules
+        recordLocalSettingsChangeAndSync()
+        if level == "off" {
+            // Drop the app's existing notifications from the popover + banners.
+            let ids = activeNotifications.filter { $0.pkg == pkg }.map { $0.id }
+            for id in ids { removeNotification(id: id) }
+        }
+    }
+
+    private func persistAppRules() {
+        if let data = try? JSONEncoder().encode(appRules) {
+            UserDefaults.standard.set(data, forKey: "appNotificationRules")
+        }
+    }
+
+    private func persistAppDisplayNames() {
+        if let data = try? JSONEncoder().encode(appDisplayNames) {
+            UserDefaults.standard.set(data, forKey: "appDisplayNames")
+        }
+    }
+
+    /// Record the display name for an app package (called when a notif arrives).
+    func noteAppName(pkg: String, name: String) {
+        guard !pkg.isEmpty, !name.isEmpty, appDisplayNames[pkg] != name else { return }
+        var names = appDisplayNames
+        names[pkg] = name
+        appDisplayNames = names
     }
 }
