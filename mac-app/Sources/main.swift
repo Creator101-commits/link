@@ -1,21 +1,6 @@
 import AppKit
 import SwiftUI
-import CoreText
 import UniformTypeIdentifiers
-
-// MARK: - Font Registration
-
-func registerCustomFonts() {
-    guard let resourcePath = Bundle.main.resourcePath else { return }
-    let fontsPath = (resourcePath as NSString).appendingPathComponent("Fonts")
-    guard let fontFiles = try? FileManager.default.contentsOfDirectory(atPath: fontsPath) else { return }
-    
-    for file in fontFiles where file.hasSuffix(".ttf") || file.hasSuffix(".otf") {
-        let fontUrl = URL(fileURLWithPath: (fontsPath as NSString).appendingPathComponent(file))
-        var error: Unmanaged<CFError>?
-        CTFontManagerRegisterFontsForURL(fontUrl as CFURL, .process, &error)
-    }
-}
 
 // MARK: - Status Item Drag & Drop Overlay View
 
@@ -82,7 +67,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     ]
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        registerCustomFonts()
         if let iconPath = Bundle.main.path(forResource: "Bridge", ofType: "icns"),
            let appIcon = NSImage(contentsOfFile: iconPath) {
             NSApp.applicationIconImage = appIcon
@@ -122,7 +106,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let pop = NSPopover()
         pop.behavior = .transient
         pop.animates = false
-        pop.appearance = NSAppearance(named: .darkAqua)
         pop.delegate = self
         // The NSHostingController is created lazily in showPopover and released
         // in popoverDidClose so the SwiftUI view tree isn't kept alive while
@@ -173,13 +156,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let maxAllowedHeight = max(420, floor(screenVisibleHeight - 36))
         let targetHeight = min(rawTargetHeight, maxAllowedHeight)
         
-        let newSize = NSSize(width: 380, height: targetHeight)
+        let newSize = NSSize(width: 360, height: targetHeight)
         if pop.contentSize != newSize {
             pop.contentSize = newSize
         }
         if let window = controller.view.window {
             window.collectionBehavior = Self.popoverWindowBehavior
-            window.backgroundColor = NSColor(red: 0x12 / 255.0, green: 0x14 / 255.0, blue: 0x18 / 255.0, alpha: 1.0)
         }
     }
     
@@ -235,7 +217,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         if let window = pop.contentViewController?.view.window {
             window.collectionBehavior = Self.popoverWindowBehavior
-            window.backgroundColor = NSColor(red: 0x12 / 255.0, green: 0x14 / 255.0, blue: 0x18 / 255.0, alpha: 1.0)
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
         }

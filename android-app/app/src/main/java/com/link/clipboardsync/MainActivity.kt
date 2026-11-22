@@ -60,9 +60,11 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     // Header views
     private lateinit var dotStatus: View
     private lateinit var tvStatusPill: TextView
+    private lateinit var tvLargeTitle: TextView
     private var dotBlinkAnimator: ObjectAnimator? = null
 
     // Setup Progress Indicator
+    private lateinit var layoutFinishSetupCard: LinearLayout
     private lateinit var layoutSetupProgress: LinearLayout
     private lateinit var tvSetupProgressStatus: TextView
     private lateinit var tvSetupProgressDetail: TextView
@@ -98,7 +100,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private lateinit var heroCard: LinearLayout
     private lateinit var tvHeroTitle: TextView
     private lateinit var tvHeroSub: TextView
-    private lateinit var linkViewHero: BridgeLinkView
+    private lateinit var linkViewHero: ImageView
     private lateinit var layoutHeroCautionBanner: LinearLayout
     private lateinit var dotHeroCaution: View
     private lateinit var tvHeroCautionTitle: TextView
@@ -123,7 +125,6 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private lateinit var switchNotifMaster: SwitchCompat
     private lateinit var tvNotifMasterPausedNotice: TextView
     private lateinit var layoutNotifSubOptions: LinearLayout
-    private lateinit var viewNotifSubAccent: View
     private lateinit var switchAndroidNotif: SwitchCompat
     private lateinit var switchMacNotif: SwitchCompat
     private lateinit var rowPhoneVibrate: LinearLayout
@@ -151,7 +152,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
     // Screen B: Pairing
     private lateinit var layoutScreenPairing: LinearLayout
-    private lateinit var linkViewPairing: BridgeLinkView
+    private lateinit var linkViewPairing: ImageView
     private lateinit var tvPairingTitle: TextView
     private lateinit var tvPairingSub: TextView
     private lateinit var layoutNoteBanner: LinearLayout
@@ -167,12 +168,17 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private lateinit var btnPair: Button
 
     // Colors
-    private val colorInk = Color.parseColor("#0E0F12")
-    private val colorLime = Color.parseColor("#C8F135")
-    private val colorCoral = Color.parseColor("#FF9A8A")
-    private val colorMuted = Color.parseColor("#9BA3AD")
-    private val colorSoft = Color.parseColor("#C9CED4")
-    private val colorText = Color.parseColor("#F4F5F2")
+    private val colorOnAccent by lazy { ContextCompat.getColor(this, R.color.on_accent) }
+    private val colorAccent by lazy { ContextCompat.getColor(this, R.color.accent) }
+    private val colorRed by lazy { ContextCompat.getColor(this, R.color.red) }
+    private val colorTertiaryLabel by lazy { ContextCompat.getColor(this, R.color.tertiary_label) }
+    private val colorSecondaryLabel by lazy { ContextCompat.getColor(this, R.color.secondary_label) }
+    private val colorLabel by lazy { ContextCompat.getColor(this, R.color.label) }
+
+    // Debug-only screenshot/demo state (BuildConfig.DEBUG + intent extra "demo_state")
+    private var demoMode = false
+    private var demoConnected = false
+    private var pendingDemoState: String? = null
 
     // QR Code Scanner Launcher
     private val qrScannerLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
@@ -216,6 +222,14 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
     }
 
+    private fun isLiveConnected(): Boolean {
+        return demoConnected || ClipboardSyncManager.networkClient?.isConnected() == true
+    }
+
+    // Debug demo mode keeps pairing purely in-memory so real prefs are never clobbered.
+    private fun uiPaired(): Boolean = if (demoMode) demoConnected else BridgePrefs.isPaired(this)
+    private fun uiMacName(): String = if (demoMode) "MacBook Pro" else (BridgePrefs.macName(this) ?: "Mac")
+
     private fun safeGetFont(resId: Int, fallback: Typeface = Typeface.DEFAULT): Typeface {
         return try {
             ResourcesCompat.getFont(this, resId) ?: fallback
@@ -228,9 +242,18 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        if (BuildConfig.DEBUG) {
+            pendingDemoState = intent.getStringExtra("demo_state")
+            demoMode = pendingDemoState != null
+            demoConnected = pendingDemoState != null && pendingDemoState != "pairing"
+        }
+
         initViews()
         setupListeners()
-        checkPermissions()
+
+        if (!demoMode) {
+            checkPermissions()
+        }
 
         // Handle navigation bar and gesture insets dynamically so bottom nav and content never overlap
         findViewById<View>(R.id.rootLayout)?.let { root ->
@@ -244,7 +267,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                     layoutBottomNav.layoutParams = navLp
                 }
 
-                val extraBottom = (52 + 18 + 48) * density.toInt() + navInsets.bottom
+                val extraBottom = (62 * density).toInt() + (18 * density).toInt() + (16 * density).toInt() + navInsets.bottom
                 findViewById<View>(R.id.layoutScrollContent)?.let { content ->
                     content.setPadding(
                         content.paddingLeft,
@@ -259,7 +282,9 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
         ClipboardSyncManager.init(this)
         BridgeNotificationManager.init(this)
-        ClipboardSyncForegroundService.start(this)
+        if (!demoMode) {
+            ClipboardSyncForegroundService.start(this)
+        }
 
         handleIncomingIntent(intent)
     }
@@ -322,7 +347,9 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         renderTransfersList()
         updateUI()
 
-        if (!BridgePrefs.isPaired(this)) {
+        if (demoMode) {
+            applyDemoState()
+        } else if (!uiPaired()) {
             ClipboardSyncManager.networkClient?.startDiscovery()
         } else if (missingBluetoothPermissions().isNotEmpty()) {
             ensureBluetoothPermissions()
@@ -341,8 +368,10 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         // Header
         dotStatus = findViewById(R.id.dotStatus)
         tvStatusPill = findViewById(R.id.tvStatusPill)
+        tvLargeTitle = findViewById(R.id.tvLargeTitle)
 
         // Setup Progress
+        layoutFinishSetupCard = findViewById(R.id.layoutFinishSetupCard)
         layoutSetupProgress = findViewById(R.id.layoutSetupProgress)
         tvSetupProgressStatus = findViewById(R.id.tvSetupProgressStatus)
         tvSetupProgressDetail = findViewById(R.id.tvSetupProgressDetail)
@@ -361,6 +390,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         layoutTabFiles = findViewById(R.id.layoutTabFiles)
         layoutTabSettings = findViewById(R.id.layoutTabSettings)
         layoutBottomNav = findViewById(R.id.layoutBottomNav)
+        findViewById<GlassTabBarView>(R.id.layoutBottomNav)
+            ?.setBlurSource(findViewById(R.id.mainScrollView))
         viewNavActiveIndicator = findViewById(R.id.viewNavActiveIndicator)
         navTabHome = findViewById(R.id.navTabHome)
         ivNavHome = findViewById(R.id.ivNavHome)
@@ -401,7 +432,6 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         switchNotifMaster = findViewById(R.id.switchNotifMaster)
         tvNotifMasterPausedNotice = findViewById(R.id.tvNotifMasterPausedNotice)
         layoutNotifSubOptions = findViewById(R.id.layoutNotifSubOptions)
-        viewNotifSubAccent = findViewById(R.id.viewNotifSubAccent)
         switchAndroidNotif = findViewById(R.id.switchAndroidNotif)
         switchMacNotif = findViewById(R.id.switchMacNotif)
         rowPhoneVibrate = findViewById(R.id.rowPhoneVibrate)
@@ -458,7 +488,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             if (it.startsWith(Build.MANUFACTURER, ignoreCase = true)) it
             else "${Build.MANUFACTURER.replaceFirstChar { c -> c.uppercase() }} $it"
         }
-        tvDevicePhoneName.text = phoneModel
+        tvDevicePhoneName.text = if (demoMode) "Pixel 8" else phoneModel
 
         // Prefill server IP if saved
         BridgePrefs.host(this)?.let { etServerIp.setText(it) }
@@ -470,13 +500,14 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             intArrayOf(android.R.attr.state_checked),
             intArrayOf(-android.R.attr.state_checked)
         )
+        // Apple-style switch: white thumb, accent track on / neutral track off.
         val thumbColors = intArrayOf(
-            colorLime,
-            colorMuted
+            colorOnAccent,
+            colorOnAccent
         )
         val trackColors = intArrayOf(
-            Color.parseColor("#4D6114"),
-            Color.parseColor("#2B2F36")
+            ContextCompat.getColor(this, R.color.accent),
+            ContextCompat.getColor(this, R.color.card_pressed)
         )
         sw.thumbTintList = ColorStateList(states, thumbColors)
         sw.trackTintList = ColorStateList(states, trackColors)
@@ -488,32 +519,39 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         if (currentTab == tabIndex) return
         currentTab = tabIndex
 
-        val fontSemibold = safeGetFont(R.font.plus_jakarta_sans_semibold, Typeface.DEFAULT_BOLD)
-        val fontMedium = safeGetFont(R.font.plus_jakarta_sans_medium, Typeface.DEFAULT)
+        val fontSemibold = safeGetFont(R.font.sf_pro_text_semibold, Typeface.DEFAULT_BOLD)
+        val fontMedium = safeGetFont(R.font.sf_pro_text_medium, Typeface.DEFAULT)
 
         // 1. Update tab icon and label styles for all 3 tabs
         val homeActive = tabIndex == TAB_HOME
         ivNavHome.setImageResource(if (homeActive) R.drawable.ic_nav_home_filled else R.drawable.ic_nav_home_outline)
-        ivNavHome.imageTintList = ColorStateList.valueOf(if (homeActive) colorLime else colorSoft)
-        tvNavHome.setTextColor(if (homeActive) colorLime else colorSoft)
+        ivNavHome.imageTintList = ColorStateList.valueOf(if (homeActive) colorAccent else colorSecondaryLabel)
+        tvNavHome.setTextColor(if (homeActive) colorAccent else colorSecondaryLabel)
         tvNavHome.typeface = if (homeActive) fontSemibold else fontMedium
 
         val filesActive = tabIndex == TAB_FILES
         ivNavFiles.setImageResource(if (filesActive) R.drawable.ic_nav_transfer_filled else R.drawable.ic_nav_transfer_outline)
-        ivNavFiles.imageTintList = ColorStateList.valueOf(if (filesActive) colorLime else colorSoft)
-        tvNavFiles.setTextColor(if (filesActive) colorLime else colorSoft)
+        ivNavFiles.imageTintList = ColorStateList.valueOf(if (filesActive) colorAccent else colorSecondaryLabel)
+        tvNavFiles.setTextColor(if (filesActive) colorAccent else colorSecondaryLabel)
         tvNavFiles.typeface = if (filesActive) fontSemibold else fontMedium
 
         val settingsActive = tabIndex == TAB_SETTINGS
         ivNavSettings.setImageResource(if (settingsActive) R.drawable.ic_nav_settings_filled else R.drawable.ic_nav_settings_outline)
-        ivNavSettings.imageTintList = ColorStateList.valueOf(if (settingsActive) colorLime else colorSoft)
-        tvNavSettings.setTextColor(if (settingsActive) colorLime else colorSoft)
+        ivNavSettings.imageTintList = ColorStateList.valueOf(if (settingsActive) colorAccent else colorSecondaryLabel)
+        tvNavSettings.setTextColor(if (settingsActive) colorAccent else colorSecondaryLabel)
         tvNavSettings.typeface = if (settingsActive) fontSemibold else fontMedium
+
+        tvLargeTitle.text = when (tabIndex) {
+            TAB_FILES -> "Files"
+            TAB_SETTINGS -> "Settings"
+            else -> "Bridge"
+        }
 
         // 2. Animate the sliding indicator pill across 3 tabs
         navPillAnimator?.cancel()
-        val pillWidth = viewNavActiveIndicator.width.toFloat().coerceAtLeast(99f * resources.displayMetrics.density)
-        val targetX = pillWidth * tabIndex
+        val segmentWidth = navTabHome.width.toFloat().coerceAtLeast(1f)
+        val indicatorWidth = viewNavActiveIndicator.width.toFloat().coerceAtLeast(1f)
+        val targetX = segmentWidth * tabIndex + (segmentWidth - indicatorWidth) / 2f
 
         val slideAnim = ObjectAnimator.ofFloat(
             viewNavActiveIndicator,
@@ -570,7 +608,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         val targetPage = when {
             tabIndex == TAB_SETTINGS -> layoutTabSettings
             tabIndex == TAB_FILES -> layoutTabFiles
-            BridgePrefs.isPaired(this) -> layoutScreenConnected
+            uiPaired() -> layoutScreenConnected
             else -> layoutScreenPairing
         }
         targetPage.alpha = 0.35f
@@ -597,7 +635,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
 
         btnSelectFilesToSend.setOnClickListener {
-            if (ClipboardSyncManager.networkClient?.isConnected() != true) {
+            if (isLiveConnected() != true) {
                 Toast.makeText(this, "Connect to your Mac first to send files.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -605,7 +643,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
 
         btnSelectFolderToSend.setOnClickListener {
-            if (ClipboardSyncManager.networkClient?.isConnected() != true) {
+            if (isLiveConnected() != true) {
                 Toast.makeText(this, "Connect to your Mac first to send folders.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -801,8 +839,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         }
 
         btnToggleConnectMacSettings.setOnClickListener {
-            if (!BridgePrefs.isPaired(this)) return@setOnClickListener
-            if (ClipboardSyncManager.networkClient?.isConnected() == true) {
+            if (!uiPaired()) return@setOnClickListener
+            if (isLiveConnected() == true) {
                 userManuallyDisconnected = true
                 consecutiveFailures = 0
                 userConnectAttempts = 0
@@ -920,12 +958,10 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         isConnectingState = connecting
         if (connecting) {
             tvStatusPill.text = "Connecting..."
-            tvStatusPill.setTextColor(colorLime)
-            dotStatus.backgroundTintList = ColorStateList.valueOf(colorLime)
+            tvStatusPill.setTextColor(colorAccent)
+            dotStatus.backgroundTintList = ColorStateList.valueOf(colorAccent)
             startDotBlink()
 
-            linkViewHero.setMode(BridgeLinkView.LinkMode.HERO_CONNECTING)
-            linkViewPairing.setMode(BridgeLinkView.LinkMode.PAIRING_CONNECTING)
             btnPair.isEnabled = false
             btnPair.text = "Connecting…"
             btnHeroConnect.isEnabled = false
@@ -964,29 +1000,38 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         when (style) {
             BannerStyle.ERROR -> {
                 layoutNoteBanner.setBackgroundResource(R.drawable.bg_note_error)
-                dotNote.backgroundTintList = ColorStateList.valueOf(colorCoral)
-                tvNoteText.setTextColor(colorCoral)
+                dotNote.backgroundTintList = ColorStateList.valueOf(colorRed)
+                tvNoteText.setTextColor(colorRed)
             }
             BannerStyle.CONNECTING -> {
                 layoutNoteBanner.setBackgroundResource(R.drawable.bg_note_connecting)
-                dotNote.backgroundTintList = ColorStateList.valueOf(colorMuted)
-                tvNoteText.setTextColor(colorMuted)
+                dotNote.backgroundTintList = ColorStateList.valueOf(colorTertiaryLabel)
+                tvNoteText.setTextColor(colorTertiaryLabel)
             }
             BannerStyle.CONNECTED -> {
                 layoutNoteBanner.setBackgroundResource(R.drawable.bg_note_connected)
-                dotNote.backgroundTintList = ColorStateList.valueOf(colorLime)
-                tvNoteText.setTextColor(colorLime)
+                dotNote.backgroundTintList = ColorStateList.valueOf(colorAccent)
+                tvNoteText.setTextColor(colorAccent)
             }
         }
     }
 
+    private fun refreshFinishSetupCard() {
+        layoutFinishSetupCard.visibility =
+            if (layoutSetupProgress.visibility == View.VISIBLE ||
+                layoutServiceNotice.visibility == View.VISIBLE ||
+                layoutNotificationNotice.visibility == View.VISIBLE
+            ) View.VISIBLE else View.GONE
+    }
+
     private fun updateSetupProgress() {
-        if (currentTab != TAB_HOME || !BridgePrefs.isPaired(this)) {
+        if (currentTab != TAB_HOME) {
             layoutSetupProgress.visibility = View.GONE
+            refreshFinishSetupCard()
             return
         }
 
-        var completed = 1 // 1 for Pairing completed
+        var completed = if (uiPaired()) 1 else 0
         val total = 3
         val acc = isAccessibilityServiceEnabled()
         val notif = isNotificationServiceEnabled()
@@ -1007,6 +1052,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             tvSetupProgressDetail.text = missing
             layoutSetupProgress.visibility = View.VISIBLE
         }
+        refreshFinishSetupCard()
     }
 
     private fun updateAccessibilityNotice() {
@@ -1021,6 +1067,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         } else {
             layoutNotificationNotice.visibility = View.VISIBLE
         }
+        refreshFinishSetupCard()
     }
 
     private fun updateSettingsUI() {
@@ -1042,9 +1089,6 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             switchAndroidNotif.isEnabled = masterEnabled
             switchMacNotif.isEnabled = masterEnabled
             layoutNotifSubOptions.alpha = if (masterEnabled) 1.0f else 0.42f
-            viewNotifSubAccent.setBackgroundColor(
-                if (masterEnabled) colorLime else Color.parseColor("#2B2F36")
-            )
             tvNotifMasterPausedNotice.visibility = if (masterEnabled) View.GONE else View.VISIBLE
 
             val macEffective = masterEnabled && macEnabled
@@ -1063,47 +1107,47 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
             if (isNotificationServiceEnabled()) {
                 tvSettingNotifAccessStatus.text = "Active"
-                tvSettingNotifAccessStatus.setTextColor(colorLime)
+                tvSettingNotifAccessStatus.setTextColor(colorAccent)
             } else {
                 tvSettingNotifAccessStatus.text = "Required"
-                tvSettingNotifAccessStatus.setTextColor(colorCoral)
+                tvSettingNotifAccessStatus.setTextColor(colorRed)
             }
 
             if (isAccessibilityServiceEnabled()) {
                 tvSettingAccessibilityStatus.text = "Active"
-                tvSettingAccessibilityStatus.setTextColor(colorLime)
+                tvSettingAccessibilityStatus.setTextColor(colorAccent)
             } else {
                 tvSettingAccessibilityStatus.text = "Required"
-                tvSettingAccessibilityStatus.setTextColor(colorCoral)
+                tvSettingAccessibilityStatus.setTextColor(colorRed)
             }
 
-            val paired = BridgePrefs.isPaired(this)
-            val isLive = paired && ClipboardSyncManager.networkClient?.isConnected() == true
+            val paired = uiPaired()
+            val isLive = paired && isLiveConnected() == true
             if (!paired) {
                 tvSettingsDeviceMacName.text = "No device paired"
                 tvSettingsDeviceStatus.text = "No device is paired or connected"
-                tvSettingsDeviceStatus.setTextColor(colorMuted)
+                tvSettingsDeviceStatus.setTextColor(colorTertiaryLabel)
                 btnToggleConnectMacSettings.visibility = View.GONE
                 btnUnpairMacSettings.visibility = View.GONE
             } else {
-                val pairedMac = BridgePrefs.macName(this) ?: "Mac"
+                val pairedMac = uiMacName()
                 tvSettingsDeviceMacName.text = pairedMac
                 btnToggleConnectMacSettings.visibility = View.VISIBLE
                 btnUnpairMacSettings.visibility = View.VISIBLE
 
                 if (isLive) {
                     tvSettingsDeviceStatus.text = "Connected · Live"
-                    tvSettingsDeviceStatus.setTextColor(colorLime)
+                    tvSettingsDeviceStatus.setTextColor(colorAccent)
                     btnToggleConnectMacSettings.isEnabled = true
                     btnToggleConnectMacSettings.text = "Disconnect"
-                    btnToggleConnectMacSettings.setTextColor(colorText)
+                    btnToggleConnectMacSettings.setTextColor(colorLabel)
                     btnToggleConnectMacSettings.setBackgroundResource(R.drawable.bg_button_outline)
                 } else {
                     tvSettingsDeviceStatus.text = if (isConnectingState) "Connecting…" else "Paired device · Disconnected"
-                    tvSettingsDeviceStatus.setTextColor(if (isConnectingState) colorLime else colorMuted)
+                    tvSettingsDeviceStatus.setTextColor(if (isConnectingState) colorAccent else colorTertiaryLabel)
                     btnToggleConnectMacSettings.isEnabled = !isConnectingState
                     btnToggleConnectMacSettings.text = if (isConnectingState) "Connecting…" else "Connect"
-                    btnToggleConnectMacSettings.setTextColor(if (isConnectingState) colorMuted else colorInk)
+                    btnToggleConnectMacSettings.setTextColor(if (isConnectingState) colorTertiaryLabel else colorOnAccent)
                     btnToggleConnectMacSettings.setBackgroundResource(if (isConnectingState) R.drawable.bg_button_outline else R.drawable.bg_button_lime)
                 }
             }
@@ -1127,6 +1171,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         val items = BridgeFileTransferManager.transfers.toList()
         val hasCompleted = items.any { it.status == TransferStatus.COMPLETED }
         btnClearCompletedTransfers.visibility = if (hasCompleted) View.VISIBLE else View.GONE
+        btnClearCompletedTransfers.setTextColor(colorAccent)
 
         if (items.isEmpty()) {
             layoutTransfersEmptyState.visibility = View.VISIBLE
@@ -1140,9 +1185,9 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         layoutTransfersList.removeAllViews()
 
         val density = resources.displayMetrics.density
-        val fontSemibold = safeGetFont(R.font.plus_jakarta_sans_semibold, Typeface.DEFAULT_BOLD)
-        val fontMedium = safeGetFont(R.font.plus_jakarta_sans_medium, Typeface.DEFAULT)
-        val fontMono = safeGetFont(R.font.dm_mono, Typeface.MONOSPACE)
+        val fontSemibold = safeGetFont(R.font.sf_pro_text_semibold, Typeface.DEFAULT_BOLD)
+        val fontMedium = safeGetFont(R.font.sf_pro_text_medium, Typeface.DEFAULT)
+        val fontMono = safeGetFont(R.font.sf_mono_medium, Typeface.MONOSPACE)
 
         for (item in items) {
             val isCompleted = item.status == TransferStatus.COMPLETED
@@ -1199,18 +1244,14 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
             val iconView = ImageView(this).apply {
                 setImageResource(item.iconResId)
-                imageTintList = ColorStateList.valueOf(
-                    when (item.status) {
-                        TransferStatus.COMPLETED -> colorLime
-                        TransferStatus.FAILED -> colorCoral
-                        TransferStatus.CANCELLED, TransferStatus.PAUSED -> colorMuted
-                        else -> colorLime
-                    }
-                )
+                imageTintList = ColorStateList.valueOf(colorSecondaryLabel)
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
                 )
+            }
+            if (isCompleted) {
+                iconView.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.green))
             }
             iconContainer.addView(iconView)
             topRow.addView(iconContainer)
@@ -1229,7 +1270,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             val dirArrow = if (item.direction == TransferDirection.OUTGOING) "↗ " else "↙ "
             val titleTv = TextView(this).apply {
                 text = dirArrow + item.fileName
-                setTextColor(colorText)
+                setTextColor(colorLabel)
                 typeface = fontSemibold
                 textSize = 13.5f
                 maxLines = 1
@@ -1271,14 +1312,13 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 text = subtitleText
                 setTextColor(
                     when (item.status) {
-                        TransferStatus.COMPLETED -> colorLime
-                        TransferStatus.FAILED -> colorCoral
-                        TransferStatus.CANCELLED -> colorMuted
-                        else -> colorMuted
+                        TransferStatus.FAILED -> colorRed
+                        TransferStatus.CANCELLED -> colorTertiaryLabel
+                        else -> colorSecondaryLabel
                     }
                 )
-                typeface = fontMono
-                textSize = 11f
+                typeface = fontMedium
+                textSize = 13f
                 val lp = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -1297,7 +1337,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             if (item.status == TransferStatus.TRANSFERRING && item.remainingTimeText.isNotEmpty()) {
                 val etaTv = TextView(this).apply {
                     text = item.remainingTimeText
-                    setTextColor(colorSoft)
+                    setTextColor(colorSecondaryLabel)
                     typeface = fontMedium
                     textSize = 11f
                     val lp = LinearLayout.LayoutParams(
@@ -1338,48 +1378,73 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 }
             }
 
+            // 36dp icon button on a cardPressed circle; 48dp touch target.
+            fun makeIconActionButton(contentDesc: String, iconRes: Int, tintColor: Int, onClick: () -> Unit): View {
+                val touch = (48 * density).toInt()
+                val circle = (36 * density).toInt()
+                val iconSz = (18 * density).toInt()
+                return FrameLayout(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(touch, touch).apply {
+                        marginStart = (2 * density).toInt()
+                    }
+                    addView(View(this@MainActivity).apply {
+                        setBackgroundResource(R.drawable.bg_action_icon_circle)
+                        layoutParams = FrameLayout.LayoutParams(circle, circle, android.view.Gravity.CENTER)
+                    })
+                    addView(ImageView(this@MainActivity).apply {
+                        setImageResource(iconRes)
+                        imageTintList = ColorStateList.valueOf(tintColor)
+                        layoutParams = FrameLayout.LayoutParams(iconSz, iconSz, android.view.Gravity.CENTER)
+                    })
+                    this.contentDescription = contentDesc
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { onClick() }
+                }
+            }
+
             when (item.status) {
                 TransferStatus.WAITING_CONFIRMATION -> {
                     if (item.direction == TransferDirection.INCOMING) {
                         actionsRow.addView(
-                            makeActionButton("Accept", colorInk, R.drawable.bg_button_lime) {
+                            makeActionButton("Accept", colorOnAccent, R.drawable.bg_button_lime) {
                                 BridgeFileTransferManager.acceptIncomingFile(this, item.id)
                             }
                         )
                     }
                     actionsRow.addView(
-                        makeActionButton("Cancel", colorMuted, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Cancel transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
                             BridgeFileTransferManager.cancelTransfer(item.id)
                         }
                     )
                 }
                 TransferStatus.TRANSFERRING -> {
                     actionsRow.addView(
-                        makeActionButton("Pause", colorSoft, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Pause transfer", R.drawable.sf_pause, colorSecondaryLabel) {
                             BridgeFileTransferManager.pauseTransfer(item.id)
                         }
                     )
                     actionsRow.addView(
-                        makeActionButton("Cancel", colorMuted, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Cancel transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
                             BridgeFileTransferManager.cancelTransfer(item.id)
                         }
                     )
                 }
                 TransferStatus.PAUSED -> {
                     actionsRow.addView(
-                        makeActionButton("Resume", colorLime, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Resume transfer", R.drawable.sf_play, colorAccent) {
                             BridgeFileTransferManager.resumeTransfer(this, item.id)
                         }
                     )
                     actionsRow.addView(
-                        makeActionButton("Cancel", colorMuted, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Cancel transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
                             BridgeFileTransferManager.cancelTransfer(item.id)
                         }
                     )
                 }
                 TransferStatus.HASHING, TransferStatus.VERIFYING -> {
                     actionsRow.addView(
-                        makeActionButton("Cancel", colorMuted, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Cancel transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
                             BridgeFileTransferManager.cancelTransfer(item.id)
                         }
                     )
@@ -1389,19 +1454,19 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 }
                 TransferStatus.FAILED -> {
                     actionsRow.addView(
-                        makeActionButton("Retry", colorLime, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Retry transfer", R.drawable.sf_arrow_clockwise, colorAccent) {
                             BridgeFileTransferManager.retryTransfer(this, item.id)
                         }
                     )
                     actionsRow.addView(
-                        makeActionButton("Dismiss", colorMuted, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Dismiss transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
                             BridgeFileTransferManager.dismissTransfer(item.id)
                         }
                     )
                 }
                 TransferStatus.CANCELLED -> {
                     actionsRow.addView(
-                        makeActionButton("Dismiss", colorMuted, R.drawable.bg_button_outline) {
+                        makeIconActionButton("Dismiss transfer", R.drawable.sf_xmark, colorTertiaryLabel) {
                             BridgeFileTransferManager.dismissTransfer(item.id)
                         }
                     )
@@ -1419,9 +1484,9 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                     max = 1000
                     progress = (item.progress * 1000f).toInt()
                     progressTintList = ColorStateList.valueOf(
-                        if (item.status == TransferStatus.PAUSED) colorMuted else colorLime
+                        if (item.status == TransferStatus.PAUSED) colorTertiaryLabel else colorAccent
                     )
-                    progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor("#2B2F36"))
+                    progressBackgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.card_pressed))
                     val lp = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         (5 * density).toInt()
@@ -1451,9 +1516,17 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                     }
                 }
 
+                val warnIcon = ImageView(this).apply {
+                    setImageResource(R.drawable.sf_exclamation)
+                    imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.orange))
+                    val lp = LinearLayout.LayoutParams((16 * density).toInt(), (16 * density).toInt())
+                    lp.marginEnd = (6 * density).toInt()
+                    layoutParams = lp
+                }
+                warnRow.addView(warnIcon)
                 val warnTv = TextView(this).apply {
-                    text = "⚠️ Executable file · Verify sender before opening"
-                    setTextColor(Color.parseColor("#F5A623"))
+                    text = "Executable file · Verify sender before opening"
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.orange))
                     typeface = fontMedium
                     textSize = 11.5f
                 }
@@ -1527,10 +1600,56 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         return false
     }
 
+    private fun applyDemoState() {
+        val state = pendingDemoState ?: return
+        pendingDemoState = null
+        when (state) {
+            "pairing" -> {
+                BridgePrefs.clearPairing(this)
+                selectTab(TAB_HOME)
+            }
+            "home", "files", "files_empty", "settings" -> {
+                BridgeFileTransferManager.transfers.clear()
+                if (state == "files") {
+                    val active = FileTransferItem(
+                        id = "demo-active", fileName = "Quarterly Report.pdf",
+                        fileSize = 48L * 1024 * 1024, direction = TransferDirection.OUTGOING,
+                        deviceName = "MacBook Pro"
+                    )
+                    active.status = TransferStatus.TRANSFERRING
+                    active.bytesTransferred = (48L * 1024 * 1024 * 2) / 5
+                    active.speedBytesPerSec = 9_400_000.0
+                    val done = FileTransferItem(
+                        id = "demo-done", fileName = "vacation-photos.zip",
+                        fileSize = 182L * 1024 * 1024, direction = TransferDirection.OUTGOING,
+                        deviceName = "MacBook Pro"
+                    )
+                    done.status = TransferStatus.COMPLETED
+                    done.bytesTransferred = done.fileSize
+                    val failed = FileTransferItem(
+                        id = "demo-fail", fileName = "setup-app.apk",
+                        fileSize = 64L * 1024 * 1024, direction = TransferDirection.INCOMING,
+                        deviceName = "MacBook Pro"
+                    )
+                    failed.status = TransferStatus.FAILED
+                    failed.errorMessage = "Connection lost during transfer."
+                    BridgeFileTransferManager.transfers.addAll(listOf(active, done, failed))
+                }
+                when (state) {
+                    "files", "files_empty" -> selectTab(TAB_FILES)
+                    "settings" -> selectTab(TAB_SETTINGS)
+                    else -> selectTab(TAB_HOME)
+                }
+                renderTransfersList()
+                updateUI()
+            }
+        }
+    }
+
     private fun updateUI() {
-        val paired = BridgePrefs.isPaired(this)
-        val connected = ClipboardSyncManager.networkClient?.isConnected() == true
-        val macName = BridgePrefs.macName(this) ?: "Mac"
+        val paired = uiPaired()
+        val connected = isLiveConnected() == true
+        val macName = uiMacName()
         val localNetAvailable = isLocalNetworkAvailable(this)
         val isMultipleFailures = consecutiveFailures >= 2 || userConnectAttempts >= 2
 
@@ -1540,7 +1659,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             connected -> macName
             else -> "$macName · Disconnected"
         }
-        tvFilesTargetMac.setTextColor(if (connected) colorLime else colorMuted)
+        tvFilesTargetMac.setTextColor(if (connected) colorAccent else colorTertiaryLabel)
         btnSelectFilesToSend.alpha = if (connected) 1.0f else 0.45f
         btnSelectFolderToSend.alpha = if (connected) 1.0f else 0.45f
 
@@ -1567,21 +1686,20 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
                 // Header status pill
                 tvStatusPill.text = "Connected"
-                tvStatusPill.setTextColor(colorLime)
-                dotStatus.backgroundTintList = ColorStateList.valueOf(colorLime)
+                tvStatusPill.setTextColor(colorSecondaryLabel)
+                dotStatus.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.green))
 
                 // Hero card (Lime)
-                heroCard.setBackgroundResource(R.drawable.bg_card_lime)
-                tvHeroTitle.text = "Your devices are in sync."
-                tvHeroTitle.setTextColor(colorInk)
-                tvHeroSub.text = "Connected and ready to go."
-                tvHeroSub.setTextColor(Color.parseColor("#425010"))
+                heroCard.setBackgroundResource(R.drawable.bg_card_panel)
+                tvHeroTitle.text = "Connected to $macName"
+                tvHeroTitle.setTextColor(colorLabel)
+                tvHeroSub.text = if (demoConnected) "Wi-Fi" else "Wi-Fi"
+                tvHeroSub.setTextColor(colorSecondaryLabel)
                 tvHeroSub.visibility = View.VISIBLE
-                linkViewHero.setMode(BridgeLinkView.LinkMode.HERO_CONNECTED)
 
                 // Devices card
                 tvLiveBadge.text = "Connected"
-                tvLiveBadge.setTextColor(colorLime)
+                tvLiveBadge.setTextColor(colorAccent)
 
                 // Bottom CTAs
                 btnHeroConnect.visibility = View.GONE
@@ -1601,49 +1719,47 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 }
 
                 tvLiveBadge.text = if (wasConnectedBefore && !userManuallyDisconnected) "Connection lost" else "Disconnected"
-                tvLiveBadge.setTextColor(colorMuted)
+                tvLiveBadge.setTextColor(colorTertiaryLabel)
 
                 if (isConnectingState) {
                     tvStatusPill.text = "Connecting..."
-                    tvStatusPill.setTextColor(colorLime)
-                    dotStatus.backgroundTintList = ColorStateList.valueOf(colorLime)
+                    tvStatusPill.setTextColor(colorAccent)
+                    dotStatus.backgroundTintList = ColorStateList.valueOf(colorAccent)
                     startDotBlink()
 
                     heroCard.setBackgroundResource(R.drawable.bg_card_panel)
                     tvHeroTitle.text = "Connecting..."
-                    tvHeroTitle.setTextColor(colorText)
+                    tvHeroTitle.setTextColor(colorLabel)
                     tvHeroSub.text = "Looking nearby over Bluetooth or Wi-Fi. This only takes a moment."
-                    tvHeroSub.setTextColor(colorMuted)
+                    tvHeroSub.setTextColor(colorTertiaryLabel)
                     tvHeroSub.visibility = View.VISIBLE
-                    linkViewHero.setMode(BridgeLinkView.LinkMode.HERO_CONNECTING)
 
                     btnHeroConnect.visibility = View.VISIBLE
                     btnHeroConnect.isEnabled = false
                     btnHeroConnect.text = "Connecting…"
-                    btnHeroConnect.setTextColor(colorMuted)
+                    btnHeroConnect.setTextColor(colorTertiaryLabel)
                     btnHeroConnect.setBackgroundResource(R.drawable.bg_button_outline)
                 } else {
                     stopDotBlink()
                     tvStatusPill.text = if (wasConnectedBefore && !userManuallyDisconnected) "Connection lost" else "Disconnected"
-                    tvStatusPill.setTextColor(colorMuted)
-                    dotStatus.backgroundTintList = ColorStateList.valueOf(colorMuted)
+                    tvStatusPill.setTextColor(colorTertiaryLabel)
+                    dotStatus.backgroundTintList = ColorStateList.valueOf(colorTertiaryLabel)
 
                     heroCard.setBackgroundResource(R.drawable.bg_card_panel)
                     tvHeroTitle.text = if (wasConnectedBefore && !userManuallyDisconnected) "Connection lost" else "Disconnected"
-                    tvHeroTitle.setTextColor(colorText)
+                    tvHeroTitle.setTextColor(colorLabel)
                     tvHeroSub.text = if (wasConnectedBefore && !userManuallyDisconnected) {
                         "Your Mac dropped offline or moved to another network."
                     } else {
                         "Your Mac is paired. Tap below to reconnect."
                     }
-                    tvHeroSub.setTextColor(colorMuted)
+                    tvHeroSub.setTextColor(colorTertiaryLabel)
                     tvHeroSub.visibility = View.VISIBLE
-                    linkViewHero.setMode(BridgeLinkView.LinkMode.HERO_IDLE)
 
                     btnHeroConnect.visibility = View.VISIBLE
                     btnHeroConnect.isEnabled = true
                     btnHeroConnect.text = if (wasConnectedBefore && !userManuallyDisconnected) "Try again" else "Connect to Mac"
-                    btnHeroConnect.setTextColor(colorInk)
+                    btnHeroConnect.setTextColor(colorOnAccent)
                     btnHeroConnect.setBackgroundResource(R.drawable.bg_button_lime)
                 }
             }
@@ -1653,26 +1769,23 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
             layoutScreenPairing.visibility = if (currentTab == TAB_HOME) View.VISIBLE else View.GONE
             layoutTabFiles.visibility = if (currentTab == TAB_FILES) View.VISIBLE else View.GONE
             layoutTabSettings.visibility = if (currentTab == TAB_SETTINGS) View.VISIBLE else View.GONE
-            layoutSetupProgress.visibility = View.GONE
 
             updateSettingsUI()
 
             if (isConnectingState) {
                 tvStatusPill.text = "Connecting..."
-                tvStatusPill.setTextColor(colorLime)
-                dotStatus.backgroundTintList = ColorStateList.valueOf(colorLime)
+                tvStatusPill.setTextColor(colorAccent)
+                dotStatus.backgroundTintList = ColorStateList.valueOf(colorAccent)
                 startDotBlink()
 
-                linkViewPairing.setMode(BridgeLinkView.LinkMode.PAIRING_CONNECTING)
                 btnPair.isEnabled = false
                 btnPair.text = "Connecting…"
             } else {
                 stopDotBlink()
                 tvStatusPill.text = "Disconnected"
-                tvStatusPill.setTextColor(colorMuted)
-                dotStatus.backgroundTintList = ColorStateList.valueOf(colorMuted)
+                tvStatusPill.setTextColor(colorTertiaryLabel)
+                dotStatus.backgroundTintList = ColorStateList.valueOf(colorTertiaryLabel)
 
-                linkViewPairing.setMode(BridgeLinkView.LinkMode.PAIRING_IDLE)
                 val clean = etPairCode.text.toString().replace(" ", "").replace("-", "")
                 btnPair.text = "Connect"
                 btnPair.isEnabled = clean.length == 6
@@ -1699,9 +1812,9 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     override fun onConnectionFailed(consecutiveFailures: Int) {
         runOnUiThread {
             this.consecutiveFailures = consecutiveFailures
-            if (ClipboardSyncManager.networkClient?.isConnected() != true) {
+            if (isLiveConnected() != true) {
                 isConnectingState = false
-                if (!BridgePrefs.isPaired(this)) {
+                if (!uiPaired()) {
                     showPairingNote(connectionErrorNote(), BannerStyle.ERROR)
                 }
                 updateUI()
@@ -1750,7 +1863,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         // Internal diagnostic log - map connection failures to friendly design copy
         runOnUiThread {
             if (message.contains("Connection dropped or failed") || message.contains("Socket closed") || message.contains("failed")) {
-                if (!BridgePrefs.isPaired(this)) {
+                if (!uiPaired()) {
                     isConnectingState = false
                     showPairingNote(connectionErrorNote(), BannerStyle.ERROR)
                     updateUI()
@@ -1772,7 +1885,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     ) { grants ->
         if (grants.values.all { it }) {
             BridgeFastLink.clearFailureCooldown()
-            if (BridgePrefs.isPaired(this)) {
+            if (uiPaired()) {
                 ClipboardSyncManager.reconnect(this)
             }
         }

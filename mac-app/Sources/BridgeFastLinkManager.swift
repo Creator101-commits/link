@@ -63,6 +63,16 @@ final class BridgeFastLinkManager: ObservableObject {
 
     // Session state — fastLinkQueue only.
     private var state: LinkState = .idle
+
+    /// Short human-readable state for UI display ("Idle", "Joining…", "Hotspot", "Restoring…").
+    var stateDescription: String {
+        switch state {
+        case .idle: return "Idle"
+        case .joining: return "Joining…"
+        case .ready: return "Hotspot"
+        case .restoring: return "Restoring…"
+        }
+    }
     private var session: String?
     private var previousSSID: String?
     private var wasOnWifi = false

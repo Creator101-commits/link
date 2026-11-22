@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="840" viewBox="0 0 1600 840"><defs><filter id="grey"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1600" height="840" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">bridge — logo directions</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Concepts for review - pick a direction (or tell me what you like in each).</text><rect x="60" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <path d="M24 94V70C24 48 42 30 64 30s40 18 40 40v24H88V70c0-13.3-10.7-24-24-24S40 56.7 40 70v24H24Z" fill="#101214"/>
+  <path d="M48 78h32v16H48z" fill="#101214"/>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="90" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <path d="M24 94V70C24 48 42 30 64 30s40 18 40 40v24H88V70c0-13.3-10.7-24-24-24S40 56.7 40 70v24H24Z" fill="#101214"/>
+  <path d="M48 78h32v16H48z" fill="#101214"/>
+</svg>
+</g><text x="122" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="180" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <path d="M24 94V70C24 48 42 30 64 30s40 18 40 40v24H88V70c0-13.3-10.7-24-24-24S40 56.7 40 70v24H24Z" fill="#101214"/>
+  <path d="M48 78h32v16H48z" fill="#101214"/>
+</svg>
+</g><text x="196" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="238" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <path d="M24 94V70C24 48 42 30 64 30s40 18 40 40v24H88V70c0-13.3-10.7-24-24-24S40 56.7 40 70v24H24Z" fill="#101214"/>
+  <path d="M48 78h32v16H48z" fill="#101214"/>
+</svg>
+</g><text x="246" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · Span</text><text x="90.0" y="664" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="90.0" y="698" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">A single, steady bridge.</text><rect x="562.667" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <path d="M48 29H36c-12.2 0-22 9.8-22 22v26c0 12.2 9.8 22 22 22h12V83H36a6 6 0 0 1-6-6V51a6 6 0 0 1 6-6h12V29Zm32 0h12c12.2 0 22 9.8 22 22v26c0 12.2-9.8 22-22 22H80V83h12a6 6 0 0 0 6-6V51a6 6 0 0 0-6-6H80V29Z" fill="#101214"/>
+  <path d="M40 56h48v16H40z" fill="#101214"/>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="592.667" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <path d="M48 29H36c-12.2 0-22 9.8-22 22v26c0 12.2 9.8 22 22 22h12V83H36a6 6 0 0 1-6-6V51a6 6 0 0 1 6-6h12V29Zm32 0h12c12.2 0 22 9.8 22 22v26c0 12.2-9.8 22-22 22H80V83h12a6 6 0 0 0 6-6V51a6 6 0 0 0-6-6H80V29Z" fill="#101214"/>
+  <path d="M40 56h48v16H40z" fill="#101214"/>
+</svg>
+</g><text x="624.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="682.667" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <path d="M48 29H36c-12.2 0-22 9.8-22 22v26c0 12.2 9.8 22 22 22h12V83H36a6 6 0 0 1-6-6V51a6 6 0 0 1 6-6h12V29Zm32 0h12c12.2 0 22 9.8 22 22v26c0 12.2-9.8 22-22 22H80V83h12a6 6 0 0 0 6-6V51a6 6 0 0 0-6-6H80V29Z" fill="#101214"/>
+  <path d="M40 56h48v16H40z" fill="#101214"/>
+</svg>
+</g><text x="698.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="740.667" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <path d="M48 29H36c-12.2 0-22 9.8-22 22v26c0 12.2 9.8 22 22 22h12V83H36a6 6 0 0 1-6-6V51a6 6 0 0 1 6-6h12V29Zm32 0h12c12.2 0 22 9.8 22 22v26c0 12.2-9.8 22-22 22H80V83h12a6 6 0 0 0 6-6V51a6 6 0 0 0-6-6H80V29Z" fill="#101214"/>
+  <path d="M40 56h48v16H40z" fill="#101214"/>
+</svg>
+</g><text x="748.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · Link</text><text x="592.6666666666667" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Two endpoints joined locally.</text><rect x="1065.33" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <path d="M23 31h25c18 0 24 15 32 29 6 11 10 16 25 16v18H94c-18 0-24-15-32-29-6-11-10-16-25-16H23V31Z" fill="#101214"/>
+  <path d="M23 79h14c6 0 10-2 14-6l10 16c-6 5-14 8-24 8H23V79Zm82-48H91c-10 0-18 3-24 8l10 16c4-4 8-6 14-6h14V31Z" fill="#101214"/>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="1095.33" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <path d="M23 31h25c18 0 24 15 32 29 6 11 10 16 25 16v18H94c-18 0-24-15-32-29-6-11-10-16-25-16H23V31Z" fill="#101214"/>
+  <path d="M23 79h14c6 0 10-2 14-6l10 16c-6 5-14 8-24 8H23V79Zm82-48H91c-10 0-18 3-24 8l10 16c4-4 8-6 14-6h14V31Z" fill="#101214"/>
+</svg>
+</g><text x="1127.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="1185.33" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <path d="M23 31h25c18 0 24 15 32 29 6 11 10 16 25 16v18H94c-18 0-24-15-32-29-6-11-10-16-25-16H23V31Z" fill="#101214"/>
+  <path d="M23 79h14c6 0 10-2 14-6l10 16c-6 5-14 8-24 8H23V79Zm82-48H91c-10 0-18 3-24 8l10 16c4-4 8-6 14-6h14V31Z" fill="#101214"/>
+</svg>
+</g><text x="1201.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" x="1243.33" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <path d="M23 31h25c18 0 24 15 32 29 6 11 10 16 25 16v18H94c-18 0-24-15-32-29-6-11-10-16-25-16H23V31Z" fill="#101214"/>
+  <path d="M23 79h14c6 0 10-2 14-6l10 16c-6 5-14 8-24 8H23V79Zm82-48H91c-10 0-18 3-24 8l10 16c4-4 8-6 14-6h14V31Z" fill="#101214"/>
+</svg>
+</g><text x="1251.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · Crossing</text><text x="1095.3333333333335" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Two paths crossing directly.</text></svg>

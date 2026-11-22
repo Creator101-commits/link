@@ -1,4 +1,4 @@
-.PHONY: all clean run install dmg
+.PHONY: all clean run install dmg snapshots
 
 APP_NAME = Bridge.app
 DMG_NAME ?= Bridge-macOS.dmg
@@ -90,3 +90,24 @@ test:
 	swiftc Tests/BridgeTests.swift Sources/BridgeNotificationModels.swift Sources/BridgeFileTransferModels.swift Sources/AXNotificationObserver.swift Sources/BridgeNotificationManager.swift Sources/BridgeFileTransferManager.swift Sources/BridgeServer.swift Sources/BridgeBluetoothRelay.swift Sources/BridgeFastLinkManager.swift Sources/BridgeModel.swift Sources/BridgeMenuView.swift -o .build-tests/BridgeTests -framework AppKit -framework SwiftUI -framework Network -framework CryptoKit -framework CoreImage -framework CoreText -framework UserNotifications -framework ApplicationServices -framework UniformTypeIdentifiers -framework CoreBluetooth -framework CoreWLAN -framework CoreLocation $(SWIFT_TARGET)
 	@.build-tests/BridgeTests
 	@rm -rf .build-tests
+
+# Design screenshots: renders BridgeMenuView for each screen in light+dark.
+# No networking/Bluetooth/Wi-Fi: BridgeModel(startServer: false) + injected state.
+SNAPSHOT_SOURCES = $(filter-out Sources/main.swift,$(SWIFT_SOURCES)) scripts/snapshot/main.swift
+SNAPSHOT_BIN = .build-snapshot/BridgeSnapshot
+SNAPSHOT_DIR = ../design/screenshots
+SNAPSHOT_SCREENS = not-paired devices notifications transfers settings
+SNAPSHOT_MODES = light dark
+
+snapshots: $(SNAPSHOT_BIN)
+	@mkdir -p $(SNAPSHOT_DIR)
+	@for screen in $(SNAPSHOT_SCREENS); do \
+		for mode in $(SNAPSHOT_MODES); do \
+			$(SNAPSHOT_BIN) $$screen $$mode $(SNAPSHOT_DIR)/mac-$$screen-$$mode.png || exit 1; \
+		done; \
+	done
+	@echo "Snapshots written to $(SNAPSHOT_DIR)"
+
+$(SNAPSHOT_BIN): $(SNAPSHOT_SOURCES)
+	@mkdir -p .build-snapshot
+	swiftc $(SNAPSHOT_SOURCES) -o $(SNAPSHOT_BIN) -framework AppKit -framework SwiftUI -framework Network -framework CryptoKit -framework CoreImage -framework CoreText -framework UserNotifications -framework ApplicationServices -framework UniformTypeIdentifiers -framework CoreBluetooth -framework CoreWLAN -framework CoreLocation $(SWIFT_TARGET)

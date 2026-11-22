@@ -1153,7 +1153,7 @@ class BridgeFileTransferManager: ObservableObject {
         content.title = item.isFolder ? "Incoming Folder from \(item.deviceName)" : "Incoming File from \(item.deviceName)"
         let formattedSize = ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file)
         if item.isExecutable {
-            content.body = "⚠️ \"\(item.fileName)\" (\(formattedSize))\nExecutable file · Confirm before accepting."
+            content.body = "\"\(item.fileName)\" (\(formattedSize))\nExecutable file · Confirm before accepting."
         } else if item.isFolder {
             content.body = "Folder \"\(item.fileName)\" (\(formattedSize))"
         } else {
@@ -1216,7 +1216,7 @@ class BridgeFileTransferManager: ObservableObject {
         content.title = isFolder ? "Folder Received from \(deviceName)" : "File Received from \(deviceName)"
         let locName = hasCustomSaveLocation ? effectiveSaveDirectory.lastPathComponent : "Downloads"
         if isExecutable {
-            content.body = "⚠️ Saved \"\(fileName)\" to \(locName) · Executable file."
+            content.body = "Saved \"\(fileName)\" to \(locName) · Executable file."
         } else if isFolder {
             content.body = "Saved folder \"\(fileName)\" to \(locName)"
         } else {

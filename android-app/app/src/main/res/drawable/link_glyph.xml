@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Link mark from design/logo-concepts/link.svg, 1:1 path geometry.
+     fillColor resolves per-theme via @color/label. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="128"
+    android:viewportHeight="128">
+    <path
+        android:fillColor="@color/label"
+        android:pathData="M48 29H36c-12.2 0-22 9.8-22 22v26c0 12.2 9.8 22 22 22h12V83H36a6 6 0 0 1-6-6V51a6 6 0 0 1 6-6h12V29ZM80 29h12c12.2 0 22 9.8 22 22v26c0 12.2-9.8 22-22 22H80V83h12a6 6 0 0 0 6-6V51a6 6 0 0 0-6-6H80V29Z" />
+    <path
+        android:fillColor="@color/label"
+        android:pathData="M40 56h48v16H40z" />
+</vector>

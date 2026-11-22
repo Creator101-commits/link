@@ -1561,9 +1561,9 @@ object BridgeFileTransferManager {
 
             val title = if (item.isFolder) "Incoming Folder Archive from ${item.deviceName}" else "Incoming File from ${item.deviceName}"
             val body = if (item.isFolder) {
-                "📁 \"${item.fileName}\" (${item.formattedTotalSize})\nFolder archive (.zip) · Confirm to accept."
+                "\"${item.fileName}\" (${item.formattedTotalSize})\nFolder archive (.zip) · Confirm to accept."
             } else if (item.isExecutable) {
-                "⚠️ \"${item.fileName}\" (${item.formattedTotalSize})\nExecutable file · Confirm to accept."
+                "\"${item.fileName}\" (${item.formattedTotalSize})\nExecutable file · Confirm to accept."
             } else {
                 "\"${item.fileName}\" (${item.formattedTotalSize})"
             }
@@ -1713,9 +1713,9 @@ object BridgeFileTransferManager {
 
             val title = if (isFolder) "Folder archive received from $macName" else "File received from $macName"
             val body = if (isFolder) {
-                "📁 $fileName saved to $locationName · Tap to extract."
+                "\"$fileName\" saved to $locationName · Tap to extract."
             } else if (isExecutable(fileName)) {
-                "⚠️ $fileName saved to $locationName · Caution: Executable file."
+                "\"$fileName\" saved to $locationName · Caution: Executable file."
             } else {
                 "$fileName saved to $locationName"
             }

@@ -1,61 +1,67 @@
 {
-  "fill": {
-    "solid": "srgb:0.78431,0.94510,0.20784,1.00000"
-  },
-  "fill-specializations": [
-    {
-      "value": {
-        "solid": "srgb:0.78431,0.94510,0.20784,1.00000"
-      }
+    "fill": {
+        "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
     },
-    {
-      "appearance": "dark",
-      "value": {
-        "solid": "srgb:0.07059,0.07843,0.09412,1.00000"
-      }
-    }
-  ],
-  "groups": [
-    {
-      "layers": [
+    "fill-specializations": [
         {
-          "image-name": "glyph-green.png",
-          "name": "Bridge Glyph Dark",
-          "opacity-specializations": [
-            {
-              "value": 0.0
-            },
-            {
-              "appearance": "dark",
-              "value": 1.0
-            },
-            {
-              "appearance": "tinted",
-              "value": 1.0
+            "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
             }
-          ]
         },
         {
-          "image-name": "glyph-black.png",
-          "name": "Bridge Glyph Light",
-          "opacity-specializations": [
-            {
-              "value": 1.0
-            },
-            {
-              "appearance": "dark",
-              "value": 0.0
-            },
-            {
-              "appearance": "tinted",
-              "value": 0.0
+            "appearance": "dark",
+            "value": {
+                "solid": "srgb:0.11000,0.11000,0.12000,1.00000"
             }
-          ]
+        },
+        {
+            "appearance": "tinted",
+            "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,0.00000"
+            }
         }
-      ]
+    ],
+    "groups": [
+        {
+            "layers": [
+                {
+                    "image-name": "glyph-white.png",
+                    "name": "Link Glyph Dark",
+                    "opacity-specializations": [
+                        {
+                            "value": 0.0
+                        },
+                        {
+                            "appearance": "dark",
+                            "value": 1.0
+                        },
+                        {
+                            "appearance": "tinted",
+                            "value": 1.0
+                        }
+                    ]
+                },
+                {
+                    "image-name": "glyph-black.png",
+                    "name": "Link Glyph Light",
+                    "opacity-specializations": [
+                        {
+                            "value": 1.0
+                        },
+                        {
+                            "appearance": "dark",
+                            "value": 0.0
+                        },
+                        {
+                            "appearance": "tinted",
+                            "value": 0.0
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "supported-platforms": {
+        "squares": "shared"
     }
-  ],
-  "supported-platforms": {
-    "squares": "shared"
-  }
 }

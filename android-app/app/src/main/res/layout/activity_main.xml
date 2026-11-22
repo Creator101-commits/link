@@ -4,7 +4,7 @@
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bridge_ink">
+    android:background="@color/background">
 
     <ScrollView
         android:id="@+id/mainScrollView"
@@ -26,35 +26,25 @@
             android:paddingEnd="20dp"
             android:paddingBottom="130dp">
 
-        <!-- Header: Logo, Wordmark, Status Pill -->
+        <!-- Large title (34sp Bold) + status pill row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <!-- Logo Mark: 34dp rounded lime square -->
-            <ImageView
-                android:id="@+id/ivHeaderMark"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:src="@drawable/ic_bridge_mark"
-                android:contentDescription="Bridge logo" />
-
-            <!-- Wordmark: lowercase "bridge" in Medium weight -->
             <TextView
-                android:id="@+id/tvWordmark"
+                android:id="@+id/tvLargeTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="10dp"
-                android:text="bridge"
-                android:textColor="@color/bridge_text"
-                android:fontFamily="@font/plus_jakarta_sans_medium"
-                android:textSize="22sp"
-                android:letterSpacing="-0.02" />
+                android:text="Bridge"
+                android:textColor="@color/label"
+                android:fontFamily="@font/sf_pro_display_bold"
+                android:textSize="34sp"
+                android:letterSpacing="0.01" />
 
-            <!-- Status Pill: 28dp height, smaller Regular label -->
+            <!-- Status Pill: dot + secondary label -->
             <LinearLayout
                 android:id="@+id/layoutStatusPill"
                 android:layout_width="wrap_content"
@@ -70,7 +60,7 @@
                     android:layout_width="6dp"
                     android:layout_height="6dp"
                     android:background="@drawable/bg_pill"
-                    android:backgroundTint="@color/bridge_muted" />
+                    android:backgroundTint="@color/secondary_label" />
 
                 <TextView
                     android:id="@+id/tvStatusPill"
@@ -78,143 +68,223 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:text="Disconnected"
-                    android:textColor="@color/bridge_muted"
-                    android:fontFamily="@font/plus_jakarta_sans_regular"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="11.5sp" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Compact Setup Progress Indicator -->
+        <!-- FINISH SETUP grouped card: progress header + permission rows -->
         <LinearLayout
-            android:id="@+id/layoutSetupProgress"
+            android:id="@+id/layoutFinishSetupCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:background="@drawable/bg_card_panel"
             android:orientation="vertical"
-            android:padding="16dp"
             android:visibility="gone">
 
             <LinearLayout
+                android:id="@+id/layoutSetupProgress"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="10dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Finish setup"
+                        android:textColor="@color/label"
+                        android:fontFamily="@font/sf_pro_text_semibold"
+                        android:textSize="17sp" />
+
+                    <TextView
+                        android:id="@+id/tvSetupProgressStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2 of 3 completed · 67%"
+                        android:textColor="@color/secondary_label"
+                        android:fontFamily="@font/sf_pro_text"
+                        android:textSize="13sp" />
+                </LinearLayout>
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:id="@+id/tvSetupProgressDetail"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Complete your setup"
-                    android:textColor="@color/bridge_text"
-                    android:fontFamily="@font/plus_jakarta_sans_semibold"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/tvSetupProgressStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="2 of 3 completed · 67%"
-                    android:textColor="@color/bridge_lime"
-                    android:fontFamily="@font/dm_mono"
-                    android:textSize="11.5sp" />
+                    android:layout_marginTop="3dp"
+                    android:text="Enable these for full sync."
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text"
+                    android:textSize="13sp" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tvSetupProgressDetail"
+            <!-- Row: Background Clipboard Service -->
+            <LinearLayout
+                android:id="@+id/layoutServiceNotice"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Enable permissions below to keep clipboard and notifications in sync."
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/plus_jakarta_sans_regular"
-                android:textSize="12.5sp" />
-        </LinearLayout>
+                android:orientation="vertical"
+                android:visibility="gone">
 
-        <!-- Optional Accessibility Notice Card -->
-        <LinearLayout
-            android:id="@+id/layoutServiceNotice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/bg_card_panel"
-            android:padding="16dp"
-            android:layout_marginTop="16dp"
-            android:visibility="gone">
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="64dp"
+                    android:background="@color/separator" />
 
-            <TextView
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <FrameLayout
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_icon_tile">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="Accessibility"
+                            android:src="@drawable/sf_hand_raised"
+                            app:tint="@color/secondary_label" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Background Clipboard Service"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text_semibold"
+                            android:textSize="17sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Keeps clipboard in sync in the background"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnEnableAccessibility"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@android:color/transparent"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:padding="8dp"
+                        android:text="Enable"
+                        android:textAllCaps="false"
+                        android:letterSpacing="0"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_pro_text_semibold"
+                        android:textSize="15sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Row: Notification Access -->
+            <LinearLayout
+                android:id="@+id/layoutNotificationNotice"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Background Clipboard Service"
-                android:textColor="@color/bridge_text"
-                android:fontFamily="@font/plus_jakarta_sans_medium"
-                android:textSize="15sp" />
+                android:orientation="vertical"
+                android:visibility="gone">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Enable Bridge in Accessibility Settings to keep your clipboard synced in the background. Synced purely over your local network."
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/plus_jakarta_sans_regular"
-                android:textSize="13sp" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="64dp"
+                    android:background="@color/separator" />
 
-            <Button
-                android:id="@+id/btnEnableAccessibility"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_button_outline"
-                app:backgroundTint="@null"
-                android:text="Enable in Settings"
-                android:textAllCaps="false"
-                android:letterSpacing="0"
-                android:textColor="@color/bridge_lime"
-                android:fontFamily="@font/plus_jakarta_sans_medium"
-                android:textSize="14sp" />
-        </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
 
-        <!-- Notification Access Notice Card -->
-        <LinearLayout
-            android:id="@+id/layoutNotificationNotice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/bg_card_panel"
-            android:padding="16dp"
-            android:layout_marginTop="14dp"
-            android:visibility="gone">
+                    <FrameLayout
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_icon_tile">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Notification Access"
-                android:textColor="@color/bridge_text"
-                android:fontFamily="@font/plus_jakarta_sans_medium"
-                android:textSize="15sp" />
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="Notifications"
+                            android:src="@drawable/sf_bell"
+                            app:tint="@color/secondary_label" />
+                    </FrameLayout>
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Bridge needs Notification Access to mirror incoming notifications and quick actions to your Mac over your local network. Your notifications are never sent to a cloud server."
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/plus_jakarta_sans_regular"
-                android:textSize="13sp" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btnEnableNotificationAccess"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_button_outline"
-                app:backgroundTint="@null"
-                android:text="Enable in Settings"
-                android:textAllCaps="false"
-                android:letterSpacing="0"
-                android:textColor="@color/bridge_lime"
-                android:fontFamily="@font/plus_jakarta_sans_medium"
-                android:textSize="14sp" />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Notification Access"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text_semibold"
+                            android:textSize="17sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Mirrors notifications to your Mac"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnEnableNotificationAccess"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@android:color/transparent"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:padding="8dp"
+                        android:text="Enable"
+                        android:textAllCaps="false"
+                        android:letterSpacing="0"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_pro_text_semibold"
+                        android:textSize="15sp" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
 
         <!-- SCREEN A: CONNECTED STATE -->
@@ -237,7 +307,7 @@
                 android:orientation="vertical"
                 android:visibility="visible">
 
-                <!-- Hero Card: Lime (#C8F135) when connected, Dark (#181B20) when idle/connecting -->
+                <!-- Hero Card: accent-soft when connected, card when idle/connecting -->
                 <LinearLayout
                     android:id="@+id/heroCard"
                     android:layout_width="match_parent"
@@ -248,6 +318,16 @@
                     android:clipToPadding="false"
                     android:orientation="vertical"
                     android:padding="24dp">
+
+                    <ImageView
+                        android:id="@+id/linkViewHero"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginBottom="14dp"
+                        android:contentDescription="Bridge"
+                        android:src="@drawable/link_glyph"
+                        app:tint="@color/label" />
 
                     <TextView
                         android:id="@+id/tvHeroTitle"
@@ -260,8 +340,8 @@
                         app:autoSizeTextType="uniform"
                         app:autoSizeMinTextSize="17sp"
                         app:autoSizeMaxTextSize="22sp"
-                        android:textColor="@color/bridge_text"
-                        android:fontFamily="@font/plus_jakarta_sans_bold"
+                        android:textColor="@color/label"
+                        android:fontFamily="@font/sf_pro_display"
                         android:textSize="22sp"
                         android:lineSpacingMultiplier="1.05"
                         android:letterSpacing="-0.02" />
@@ -274,17 +354,12 @@
                         android:gravity="center_horizontal"
                         android:textAlignment="center"
                         android:text="Connected and ready to go."
-                        android:textColor="@color/bridge_muted"
-                        android:fontFamily="@font/plus_jakarta_sans_regular"
+                        android:textColor="@color/secondary_label"
+                        android:fontFamily="@font/sf_pro_text"
                         android:textSize="14sp"
                         android:lineSpacingMultiplier="1.3" />
 
-                    <!-- Native link animation view -->
-                    <com.link.clipboardsync.BridgeLinkView
-                        android:id="@+id/linkViewHero"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp" />
+
                 </LinearLayout>
 
                 <!-- Actionable Connection Troubleshooting Card (Shown on failure) -->
@@ -309,7 +384,7 @@
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:background="@drawable/bg_pill"
-                            android:backgroundTint="@color/bridge_coral" />
+                            android:backgroundTint="@color/red" />
 
                         <TextView
                             android:id="@+id/tvHeroCautionTitle"
@@ -318,8 +393,8 @@
                             android:layout_weight="1"
                             android:layout_marginStart="10dp"
                             android:text="Couldn't connect to your Mac"
-                            android:textColor="@color/bridge_coral"
-                            android:fontFamily="@font/plus_jakarta_sans_semibold"
+                            android:textColor="@color/red"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="14sp" />
 
                         <TextView
@@ -328,8 +403,8 @@
                             android:layout_height="wrap_content"
                             android:padding="4dp"
                             android:text="Details"
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12sp" />
                     </LinearLayout>
 
@@ -339,8 +414,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="Bridge couldn't reach your Mac. Please verify the following:"
-                        android:textColor="@color/bridge_coral"
-                        android:fontFamily="@font/plus_jakarta_sans_regular"
+                        android:textColor="@color/red"
+                        android:fontFamily="@font/sf_pro_text"
                         android:textSize="13sp"
                         android:lineSpacingMultiplier="1.3" />
 
@@ -357,8 +432,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="• Make sure Bridge is running on your Mac."
-                            android:textColor="@color/bridge_soft"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
 
                         <TextView
@@ -366,8 +441,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
                             android:text="• Keep Bluetooth on — no Wi-Fi or internet needed."
-                            android:textColor="@color/bridge_soft"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
 
                         <TextView
@@ -375,8 +450,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
                             android:text="• Check whether a VPN, client isolation, or firewall is blocking the connection."
-                            android:textColor="@color/bridge_soft"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -406,8 +481,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="THIS PHONE"
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/dm_mono"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text_semibold"
                             android:textSize="11sp"
                             android:letterSpacing="0.12" />
 
@@ -417,8 +492,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
                             android:text="Galaxy A52s"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="17sp"
                             android:letterSpacing="-0.01" />
                     </LinearLayout>
@@ -427,7 +502,7 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="@color/bridge_line" />
+                        android:background="@color/separator" />
 
                     <!-- Row 2: YOUR MAC -->
                     <LinearLayout
@@ -448,8 +523,8 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="YOUR MAC"
-                                android:textColor="@color/bridge_muted"
-                                android:fontFamily="@font/dm_mono"
+                                android:textColor="@color/secondary_label"
+                                android:fontFamily="@font/sf_pro_text_semibold"
                                 android:textSize="11sp"
                                 android:letterSpacing="0.12" />
 
@@ -459,8 +534,8 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
                                 android:text="MacBook"
-                                android:textColor="@color/bridge_text"
-                                android:fontFamily="@font/plus_jakarta_sans_medium"
+                                android:textColor="@color/label"
+                                android:fontFamily="@font/sf_pro_text"
                                 android:textSize="17sp"
                                 android:letterSpacing="-0.01" />
                         </LinearLayout>
@@ -470,8 +545,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Connected"
-                            android:textColor="@color/bridge_lime"
-                            android:fontFamily="@font/dm_mono"
+                            android:textColor="@color/accent"
+                            android:fontFamily="@font/sf_pro_text_semibold"
                             android:textSize="12sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -496,8 +571,8 @@
                     android:text="Connect to Mac"
                     android:textAllCaps="false"
                     android:letterSpacing="0"
-                    android:textColor="@color/bridge_ink"
-                    android:fontFamily="@font/plus_jakarta_sans_semibold"
+                    android:textColor="@color/background"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="16sp"
                     android:visibility="gone" />
 
@@ -515,8 +590,8 @@
                     android:text="Unpair this Mac"
                     android:textAllCaps="false"
                     android:letterSpacing="0"
-                    android:textColor="@color/bridge_coral"
-                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                    android:textColor="@color/red"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="16sp"
                     android:visibility="gone" />
             </LinearLayout>
@@ -535,8 +610,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="22dp"
                 android:text="TRANSFER"
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/dm_mono"
+                android:textColor="@color/secondary_label"
+                android:fontFamily="@font/sf_pro_text_semibold"
                 android:textSize="11sp"
                 android:letterSpacing="0.14" />
 
@@ -563,8 +638,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="SEND TO"
-                        android:textColor="@color/bridge_muted"
-                        android:fontFamily="@font/dm_mono"
+                        android:textColor="@color/secondary_label"
+                        android:fontFamily="@font/sf_pro_text_semibold"
                         android:textSize="11sp"
                         android:letterSpacing="0.12" />
 
@@ -579,8 +654,8 @@
                         android:paddingEnd="10dp"
                         android:paddingBottom="3dp"
                         android:text="Mac"
-                        android:textColor="@color/bridge_lime"
-                        android:fontFamily="@font/plus_jakarta_sans_semibold"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_pro_text"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -589,8 +664,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:text="Send files or folders to your Mac"
-                    android:textColor="@color/bridge_text"
-                    android:fontFamily="@font/plus_jakarta_sans_bold"
+                    android:textColor="@color/label"
+                    android:fontFamily="@font/sf_pro_display"
                     android:textSize="17.5sp" />
 
                 <TextView
@@ -599,8 +674,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
                     android:text="Transfer files or folders over Bluetooth or local Wi-Fi — no internet needed."
-                    android:textColor="@color/bridge_muted"
-                    android:fontFamily="@font/plus_jakarta_sans_regular"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="12.5sp"
                     android:lineSpacingMultiplier="1.25" />
 
@@ -613,38 +688,46 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSelectFilesToSend"
                         android:layout_width="0dp"
-                        android:layout_height="50dp"
+                        android:layout_height="44dp"
                         android:layout_weight="1"
                         android:layout_marginEnd="6dp"
-                        android:background="@drawable/bg_button_lime"
+                        android:background="@drawable/bg_button_outline"
                         app:backgroundTint="@null"
-                        app:cornerRadius="25dp"
+                        app:cornerRadius="12dp"
+                        app:icon="@drawable/sf_doc"
+                        app:iconTint="@color/accent"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
-                        android:text="Select Files"
+                        android:text="Send Files"
                         android:textAllCaps="false"
                         android:letterSpacing="0"
-                        android:textColor="@color/bridge_ink"
-                        android:fontFamily="@font/plus_jakarta_sans_semibold"
-                        android:textSize="14.5sp" />
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_pro_text_semibold"
+                        android:textSize="15sp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSelectFolderToSend"
                         android:layout_width="0dp"
-                        android:layout_height="50dp"
+                        android:layout_height="44dp"
                         android:layout_weight="1"
                         android:layout_marginStart="6dp"
-                        android:background="@drawable/bg_button_lime"
+                        android:background="@drawable/bg_button_outline"
                         app:backgroundTint="@null"
-                        app:cornerRadius="25dp"
+                        app:cornerRadius="12dp"
+                        app:icon="@drawable/sf_folder"
+                        app:iconTint="@color/accent"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
-                        android:text="Select Folder"
+                        android:text="Send Folder"
                         android:textAllCaps="false"
                         android:letterSpacing="0"
-                        android:textColor="@color/bridge_ink"
-                        android:fontFamily="@font/plus_jakarta_sans_semibold"
-                        android:textSize="14.5sp" />
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_pro_text_semibold"
+                        android:textSize="15sp" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -661,8 +744,8 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="TRANSFERS"
-                    android:textColor="@color/bridge_muted"
-                    android:fontFamily="@font/dm_mono"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text_semibold"
                     android:textSize="11sp"
                     android:letterSpacing="0.14" />
 
@@ -672,8 +755,8 @@
                     android:layout_height="wrap_content"
                     android:padding="4dp"
                     android:text="Clear completed"
-                    android:textColor="@color/bridge_coral"
-                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                    android:textColor="@color/red"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="12.5sp"
                     android:visibility="gone" />
             </LinearLayout>
@@ -693,8 +776,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="No recent transfers"
-                    android:textColor="@color/bridge_soft"
-                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="14.5sp" />
 
                 <TextView
@@ -703,8 +786,8 @@
                     android:layout_marginTop="4dp"
                     android:gravity="center"
                     android:text="Files you send or receive from your Mac will appear here with live progress. Incoming files are saved to Downloads."
-                    android:textColor="@color/bridge_muted"
-                    android:fontFamily="@font/plus_jakarta_sans_regular"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="12.5sp"
                     android:lineSpacingMultiplier="1.3" />
             </LinearLayout>
@@ -733,8 +816,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="22dp"
                 android:text="SYNCED SETTINGS"
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/dm_mono"
+                android:textColor="@color/secondary_label"
+                android:fontFamily="@font/sf_pro_text_semibold"
                 android:textSize="11sp"
                 android:letterSpacing="0.14" />
 
@@ -768,8 +851,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Notifications"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_semibold"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="16sp" />
 
                         <TextView
@@ -777,8 +860,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Sync notifications between phone and Mac"
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="13sp" />
 
                         <!-- Status explanation when master toggle is off -->
@@ -788,8 +871,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
                             android:text="Paused while notification sync is off."
-                            android:textColor="@color/bridge_coral"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/red"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12sp"
                             android:visibility="gone" />
                     </LinearLayout>
@@ -809,21 +892,11 @@
                     android:layout_marginTop="14dp"
                     android:orientation="horizontal">
 
-                    <!-- Left Vertical Guide Line -->
-                    <View
-                        android:id="@+id/viewNotifSubAccent"
-                        android:layout_width="2dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginStart="4dp"
-                        android:layout_marginTop="4dp"
-                        android:layout_marginBottom="4dp"
-                        android:background="@color/bridge_lime" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="16dp"
                         android:orientation="vertical">
 
                         <!-- Sub-option 1: Android Notifications -->
@@ -846,8 +919,8 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="Android Notifications"
-                                    android:textColor="@color/bridge_text"
-                                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                                    android:textColor="@color/label"
+                                    android:fontFamily="@font/sf_pro_text"
                                     android:textSize="15sp" />
 
                                 <TextView
@@ -855,8 +928,8 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
                                     android:text="Show phone notifications on your Mac"
-                                    android:textColor="@color/bridge_muted"
-                                    android:fontFamily="@font/plus_jakarta_sans_regular"
+                                    android:textColor="@color/secondary_label"
+                                    android:fontFamily="@font/sf_pro_text"
                                     android:textSize="12.5sp" />
                             </LinearLayout>
 
@@ -871,7 +944,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:background="@color/bridge_line" />
+                            android:background="@color/separator" />
 
                         <!-- Sub-option 2: Mac Notifications -->
                         <LinearLayout
@@ -893,8 +966,8 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="Mac Notifications"
-                                    android:textColor="@color/bridge_text"
-                                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                                    android:textColor="@color/label"
+                                    android:fontFamily="@font/sf_pro_text"
                                     android:textSize="15sp" />
 
                                 <TextView
@@ -902,8 +975,8 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
                                     android:text="Show Mac notifications on this phone"
-                                    android:textColor="@color/bridge_muted"
-                                    android:fontFamily="@font/plus_jakarta_sans_regular"
+                                    android:textColor="@color/secondary_label"
+                                    android:fontFamily="@font/sf_pro_text"
                                     android:textSize="12.5sp" />
                             </LinearLayout>
 
@@ -921,7 +994,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginTop="8dp"
-                    android:background="@color/bridge_line" />
+                    android:background="@color/separator" />
 
                 <!-- Auto-Accept Incoming Files (Synced) -->
                 <LinearLayout
@@ -944,8 +1017,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Auto-Accept Incoming Files"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="15sp" />
 
                         <TextView
@@ -953,8 +1026,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Automatically accept files from paired devices without prompting"
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
                     </LinearLayout>
 
@@ -985,8 +1058,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Fast transfers (hotspot)"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="15sp" />
 
                         <TextView
@@ -994,8 +1067,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Uses a private phone hotspot for files when you're not on the same Wi-Fi. No internet or mobile data used."
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
                     </LinearLayout>
 
@@ -1013,8 +1086,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
                 android:text="PHONE ONLY"
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/dm_mono"
+                android:textColor="@color/secondary_label"
+                android:fontFamily="@font/sf_pro_text_semibold"
                 android:textSize="11sp"
                 android:letterSpacing="0.14" />
 
@@ -1051,8 +1124,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Vibrate for Mac Notifications"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="15sp" />
 
                         <TextView
@@ -1060,8 +1133,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Vibrate your phone when a Mac notification arrives"
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
                     </LinearLayout>
 
@@ -1075,7 +1148,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="@color/bridge_line" />
+                    android:background="@color/separator" />
 
                 <!-- Preferred Save Location Row -->
                 <LinearLayout
@@ -1098,8 +1171,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Location to Save Files"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="15sp" />
 
                         <TextView
@@ -1108,8 +1181,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Downloads (/storage/emulated/0/Download)"
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp"
                             android:maxLines="1"
                             android:ellipsize="middle" />
@@ -1127,13 +1200,13 @@
                             android:layout_height="wrap_content"
                             android:layout_marginEnd="6dp"
                             android:background="@drawable/bg_pill"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:fontFamily="@font/sf_pro_text"
                             android:paddingStart="10dp"
                             android:paddingTop="6dp"
                             android:paddingEnd="10dp"
                             android:paddingBottom="6dp"
                             android:text="Reset"
-                            android:textColor="@color/bridge_muted"
+                            android:textColor="@color/secondary_label"
                             android:textSize="12sp"
                             android:visibility="gone" />
 
@@ -1141,22 +1214,29 @@
                             android:id="@+id/btnChangeSaveLocation"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:background="@drawable/bg_button_outline"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
-                            android:paddingStart="12dp"
+                            android:fontFamily="@font/sf_pro_text_semibold"
+                            android:paddingStart="8dp"
                             android:paddingTop="6dp"
-                            android:paddingEnd="12dp"
+                            android:paddingEnd="2dp"
                             android:paddingBottom="6dp"
                             android:text="Change"
-                            android:textColor="@color/bridge_lime"
-                            android:textSize="12sp" />
+                            android:textColor="@color/accent"
+                            android:textSize="13sp" />
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="2dp"
+                            android:contentDescription="Change save location"
+                            android:src="@drawable/sf_chevron_right"
+                            app:tint="@color/tertiary_label" />
                     </LinearLayout>
                 </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="@color/bridge_line" />
+                    android:background="@color/separator" />
 
                 <!-- Notification Listener Permission Row -->
                 <LinearLayout
@@ -1182,8 +1262,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Notification Access"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="15sp" />
 
                         <TextView
@@ -1191,8 +1271,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="System permission to read phone alerts. Processed locally only."
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
                     </LinearLayout>
 
@@ -1200,16 +1280,16 @@
                         android:id="@+id/tvSettingNotifAccessStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:fontFamily="@font/dm_mono"
+                        android:fontFamily="@font/sf_pro_text_semibold"
                         android:text="Active"
-                        android:textColor="@color/bridge_lime"
+                        android:textColor="@color/accent"
                         android:textSize="12sp" />
                 </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="@color/bridge_line" />
+                    android:background="@color/separator" />
 
                 <!-- Background Accessibility Service Row -->
                 <LinearLayout
@@ -1235,8 +1315,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Background Clipboard Service"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="15sp" />
 
                         <TextView
@@ -1244,8 +1324,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Keeps clipboard sync running in background"
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
                     </LinearLayout>
 
@@ -1253,9 +1333,9 @@
                         android:id="@+id/tvSettingAccessibilityStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:fontFamily="@font/dm_mono"
+                        android:fontFamily="@font/sf_pro_text_semibold"
                         android:text="Active"
-                        android:textColor="@color/bridge_lime"
+                        android:textColor="@color/accent"
                         android:textSize="12sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -1266,8 +1346,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
                 android:text="DEVICE MANAGEMENT"
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/dm_mono"
+                android:textColor="@color/secondary_label"
+                android:fontFamily="@font/sf_pro_text_semibold"
                 android:textSize="11sp"
                 android:letterSpacing="0.14" />
 
@@ -1297,8 +1377,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="MacBook Air"
-                            android:textColor="@color/bridge_text"
-                            android:fontFamily="@font/plus_jakarta_sans_medium"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="16sp" />
 
                         <TextView
@@ -1307,8 +1387,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Paired device"
-                            android:textColor="@color/bridge_muted"
-                            android:fontFamily="@font/plus_jakarta_sans_regular"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
                             android:textSize="12.5sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -1326,8 +1406,8 @@
                     android:text="Disconnect"
                     android:textAllCaps="false"
                     android:letterSpacing="0"
-                    android:textColor="@color/bridge_text"
-                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                    android:textColor="@color/label"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="15sp" />
 
                 <com.google.android.material.button.MaterialButton
@@ -1343,8 +1423,8 @@
                     android:text="Unpair this Mac"
                     android:textAllCaps="false"
                     android:letterSpacing="0"
-                    android:textColor="@color/bridge_coral"
-                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                    android:textColor="@color/red"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="15sp" />
             </LinearLayout>
         </LinearLayout>
@@ -1359,12 +1439,15 @@
             android:orientation="vertical"
             android:visibility="visible">
 
-            <!-- Link illustration with generous top space below topbar -->
-            <com.link.clipboardsync.BridgeLinkView
+            <ImageView
                 android:id="@+id/linkViewPairing"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp" />
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="40dp"
+                android:contentDescription="Bridge"
+                android:src="@drawable/link_glyph"
+                app:tint="@color/label" />
 
             <!-- Headline on a single line with left alignment per guidelines -->
             <TextView
@@ -1377,8 +1460,8 @@
                 app:autoSizeTextType="uniform"
                 app:autoSizeMinTextSize="17sp"
                 app:autoSizeMaxTextSize="22sp"
-                android:textColor="@color/bridge_text"
-                android:fontFamily="@font/plus_jakarta_sans_bold"
+                android:textColor="@color/label"
+                android:fontFamily="@font/sf_pro_display"
                 android:textSize="22sp"
                 android:lineSpacingMultiplier="1.05"
                 android:letterSpacing="-0.02" />
@@ -1389,8 +1472,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="Open Bridge from your Mac\'s menu bar. Scan the QR code displayed on your Mac or enter its pairing code below."
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/plus_jakarta_sans_regular"
+                android:textColor="@color/secondary_label"
+                android:fontFamily="@font/sf_pro_text"
                 android:textSize="14.5sp"
                 android:lineSpacingMultiplier="1.45" />
 
@@ -1411,7 +1494,7 @@
                     android:layout_width="8dp"
                     android:layout_height="8dp"
                     android:background="@drawable/bg_pill"
-                    android:backgroundTint="@color/bridge_coral" />
+                    android:backgroundTint="@color/red" />
 
                 <TextView
                     android:id="@+id/tvNoteText"
@@ -1420,8 +1503,8 @@
                     android:layout_weight="1"
                     android:layout_marginStart="10dp"
                     android:text="Couldn't reach your Mac. Make sure Bluetooth is on (or both are on the same Wi-Fi) and Bridge is open on your Mac."
-                    android:textColor="@color/bridge_coral"
-                    android:fontFamily="@font/plus_jakarta_sans_regular"
+                    android:textColor="@color/red"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="14sp"
                     android:lineSpacingMultiplier="1.35" />
             </LinearLayout>
@@ -1444,8 +1527,8 @@
                 android:text="Scan QR code"
                 android:textAllCaps="false"
                 android:letterSpacing="0"
-                android:textColor="@color/bridge_ink"
-                android:fontFamily="@font/plus_jakarta_sans_semibold"
+                android:textColor="@color/background"
+                android:fontFamily="@font/sf_pro_text"
                 android:textSize="16sp" />
 
             <!-- OR Divider -->
@@ -1460,7 +1543,7 @@
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1"
-                    android:background="@color/bridge_line" />
+                    android:background="@color/separator" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -1468,8 +1551,8 @@
                     android:layout_marginStart="12dp"
                     android:layout_marginEnd="12dp"
                     android:text="OR TYPE THE CODE"
-                    android:textColor="@color/bridge_muted"
-                    android:fontFamily="@font/dm_mono"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text_semibold"
                     android:textSize="11sp"
                     android:letterSpacing="0.14" />
 
@@ -1477,7 +1560,7 @@
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1"
-                    android:background="@color/bridge_line" />
+                    android:background="@color/separator" />
             </LinearLayout>
 
             <!-- 6 Digit Code Boxes backed by single hidden numeric input -->
@@ -1502,8 +1585,8 @@
                         android:layout_height="60dp"
                         android:background="@drawable/bg_code_box_active"
                         android:gravity="center"
-                        android:textColor="@color/bridge_lime"
-                        android:fontFamily="@font/dm_mono_medium"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_mono_medium"
                         android:textSize="26sp" />
 
                     <!-- Box 1 -->
@@ -1514,8 +1597,8 @@
                         android:layout_marginStart="8dp"
                         android:background="@drawable/bg_code_box"
                         android:gravity="center"
-                        android:textColor="@color/bridge_lime"
-                        android:fontFamily="@font/dm_mono_medium"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_mono_medium"
                         android:textSize="26sp" />
 
                     <!-- Box 2 -->
@@ -1526,8 +1609,8 @@
                         android:layout_marginStart="8dp"
                         android:background="@drawable/bg_code_box"
                         android:gravity="center"
-                        android:textColor="@color/bridge_lime"
-                        android:fontFamily="@font/dm_mono_medium"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_mono_medium"
                         android:textSize="26sp" />
 
                     <!-- Dash separator -->
@@ -1536,7 +1619,7 @@
                         android:layout_height="2dp"
                         android:layout_marginStart="8dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@color/bridge_outline" />
+                        android:background="@color/separator" />
 
                     <!-- Box 3 -->
                     <TextView
@@ -1545,8 +1628,8 @@
                         android:layout_height="60dp"
                         android:background="@drawable/bg_code_box"
                         android:gravity="center"
-                        android:textColor="@color/bridge_lime"
-                        android:fontFamily="@font/dm_mono_medium"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_mono_medium"
                         android:textSize="26sp" />
 
                     <!-- Box 4 -->
@@ -1557,8 +1640,8 @@
                         android:layout_marginStart="8dp"
                         android:background="@drawable/bg_code_box"
                         android:gravity="center"
-                        android:textColor="@color/bridge_lime"
-                        android:fontFamily="@font/dm_mono_medium"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_mono_medium"
                         android:textSize="26sp" />
 
                     <!-- Box 5 -->
@@ -1569,8 +1652,8 @@
                         android:layout_marginStart="8dp"
                         android:background="@drawable/bg_code_box"
                         android:gravity="center"
-                        android:textColor="@color/bridge_lime"
-                        android:fontFamily="@font/dm_mono_medium"
+                        android:textColor="@color/accent"
+                        android:fontFamily="@font/sf_mono_medium"
                         android:textSize="26sp" />
                 </LinearLayout>
 
@@ -1597,8 +1680,8 @@
                 android:layout_marginTop="16dp"
                 android:padding="6dp"
                 android:text="Enter IP address instead"
-                android:textColor="@color/bridge_muted"
-                android:fontFamily="@font/plus_jakarta_sans_regular"
+                android:textColor="@color/secondary_label"
+                android:fontFamily="@font/sf_pro_text"
                 android:textSize="14sp" />
 
             <!-- Expandable Manual IP Container -->
@@ -1616,8 +1699,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Manual connection"
-                    android:textColor="@color/bridge_text"
-                    android:fontFamily="@font/plus_jakarta_sans_semibold"
+                    android:textColor="@color/label"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="14sp" />
 
                 <TextView
@@ -1625,8 +1708,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="Use this if automatic discovery isn't working."
-                    android:textColor="@color/bridge_muted"
-                    android:fontFamily="@font/plus_jakarta_sans_regular"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text"
                     android:textSize="12.5sp" />
 
                 <TextView
@@ -1634,8 +1717,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:text="MAC IP ADDRESS"
-                    android:textColor="@color/bridge_muted"
-                    android:fontFamily="@font/dm_mono"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text_semibold"
                     android:textSize="11sp"
                     android:letterSpacing="0.12" />
 
@@ -1647,11 +1730,11 @@
                     android:background="@drawable/bg_code_box"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
-                    android:textColor="@color/bridge_text"
-                    android:fontFamily="@font/dm_mono"
+                    android:textColor="@color/label"
+                    android:fontFamily="@font/sf_pro_text_semibold"
                     android:textSize="14sp"
                     android:hint="e.g. 192.168.1.100"
-                    android:textColorHint="@color/bridge_muted"
+                    android:textColorHint="@color/secondary_label"
                     android:inputType="textUri" />
 
                 <TextView
@@ -1659,8 +1742,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:text="PORT"
-                    android:textColor="@color/bridge_muted"
-                    android:fontFamily="@font/dm_mono"
+                    android:textColor="@color/secondary_label"
+                    android:fontFamily="@font/sf_pro_text_semibold"
                     android:textSize="11sp"
                     android:letterSpacing="0.12" />
 
@@ -1672,8 +1755,8 @@
                     android:background="@drawable/bg_code_box"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
-                    android:textColor="@color/bridge_text"
-                    android:fontFamily="@font/dm_mono"
+                    android:textColor="@color/label"
+                    android:fontFamily="@font/sf_pro_text_semibold"
                     android:textSize="14sp"
                     android:text="8765"
                     android:inputType="number" />
@@ -1698,11 +1781,11 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:enabled="false"
-                android:text="Connect"
+                android:text="Connect your Mac"
                 android:textAllCaps="false"
                 android:letterSpacing="0"
-                android:textColor="@color/bridge_text"
-                android:fontFamily="@font/plus_jakarta_sans_medium"
+                android:textColor="@color/label"
+                android:fontFamily="@font/sf_pro_text"
                 android:textSize="16sp" />
 
             <!-- Hidden legacy button (now handled in Settings) -->
@@ -1717,13 +1800,14 @@
     </ScrollView>
 
     <!-- Compact Floating Bottom Navigation Bar (iOS / Telegram Pill Style) -->
-    <FrameLayout
+    <com.link.clipboardsync.GlassTabBarView
         android:id="@+id/layoutBottomNav"
-        android:layout_width="305dp"
-        android:layout_height="52dp"
+        android:layout_width="match_parent"
+        android:layout_height="62dp"
         android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
         android:layout_marginBottom="18dp"
-        android:background="@drawable/bg_bottom_nav_bar"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:elevation="14dp"
@@ -1762,16 +1846,16 @@
                     android:layout_height="19dp"
                     android:contentDescription="Home"
                     android:src="@drawable/ic_nav_home_filled"
-                    app:tint="@color/bridge_lime" />
+                    app:tint="@color/accent" />
 
                 <TextView
                     android:id="@+id/tvNavHome"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
-                    android:fontFamily="@font/plus_jakarta_sans_semibold"
+                    android:fontFamily="@font/sf_pro_text"
                     android:text="Home"
-                    android:textColor="@color/bridge_lime"
+                    android:textColor="@color/accent"
                     android:textSize="11sp" />
             </LinearLayout>
 
@@ -1794,16 +1878,16 @@
                     android:layout_height="19dp"
                     android:contentDescription="Transfer"
                     android:src="@drawable/ic_nav_transfer_outline"
-                    app:tint="@color/bridge_soft" />
+                    app:tint="@color/secondary_label" />
 
                 <TextView
                     android:id="@+id/tvNavFiles"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
-                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                    android:fontFamily="@font/sf_pro_text"
                     android:text="Transfer"
-                    android:textColor="@color/bridge_soft"
+                    android:textColor="@color/secondary_label"
                     android:textSize="11sp" />
             </LinearLayout>
 
@@ -1824,18 +1908,18 @@
                     android:layout_height="19dp"
                     android:contentDescription="Settings"
                     android:src="@drawable/ic_nav_settings_outline"
-                    app:tint="@color/bridge_soft" />
+                    app:tint="@color/secondary_label" />
 
                 <TextView
                     android:id="@+id/tvNavSettings"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
-                    android:fontFamily="@font/plus_jakarta_sans_medium"
+                    android:fontFamily="@font/sf_pro_text"
                     android:text="Settings"
-                    android:textColor="@color/bridge_soft"
+                    android:textColor="@color/secondary_label"
                     android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
-    </FrameLayout>
+    </com.link.clipboardsync.GlassTabBarView>
 </FrameLayout>

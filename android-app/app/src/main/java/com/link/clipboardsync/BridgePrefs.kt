@@ -184,6 +184,7 @@ object BridgePrefs {
             .apply()
     }
 
+
     fun clearPairing(context: Context) {
         prefs(context).edit()
             .remove(KEY_HOST)

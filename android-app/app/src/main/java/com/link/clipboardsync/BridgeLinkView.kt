@@ -17,6 +17,7 @@ import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
+import androidx.core.content.ContextCompat
 
 class BridgeLinkView @JvmOverloads constructor(
     context: Context,
@@ -36,13 +37,13 @@ class BridgeLinkView @JvmOverloads constructor(
     private var mode: LinkMode = LinkMode.HERO_IDLE
 
     // Design Tokens
-    private val colorInk = Color.parseColor("#0E0F12")
-    private val colorLime = Color.parseColor("#C8F135")
-    private val colorCoral = Color.parseColor("#FF9A8A")
-    private val colorMuted = Color.parseColor("#9BA3AD")
-    private val colorLine2 = Color.parseColor("#3A3F47")
-    private val colorHeroIdleNode = Color.parseColor("#262A31")
-    private val colorPairingNode = Color.parseColor("#1C1F25")
+    private val colorOnAccent = ContextCompat.getColor(context, R.color.on_accent)
+    private val colorAccent = ContextCompat.getColor(context, R.color.accent)
+    private val colorRed = ContextCompat.getColor(context, R.color.red)
+    private val colorTertiaryLabel = ContextCompat.getColor(context, R.color.tertiary_label)
+    private val colorSeparator = ContextCompat.getColor(context, R.color.separator)
+    private val colorFill = ContextCompat.getColor(context, R.color.card_pressed)
+    private val colorCard = ContextCompat.getColor(context, R.color.card)
 
     // Paints
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -161,81 +162,81 @@ class BridgeLinkView @JvmOverloads constructor(
     private fun updatePaintsForMode() {
         when (mode) {
             LinkMode.HERO_CONNECTED -> {
-                trackPaint.color = colorInk
+                trackPaint.color = colorOnAccent
                 trackPaint.alpha = (255 * 0.25f).toInt()
                 trackPaint.pathEffect = DashPathEffect(floatArrayOf(2f, 7f), 0f)
 
-                wirePaint.color = colorInk
+                wirePaint.color = colorOnAccent
                 wirePaint.alpha = 255
 
-                nodePaint.color = colorInk
-                iconPaint.color = colorLime
-                midDotPaint.color = colorInk
-                packetPaint.color = colorInk
-                ringPaint.color = colorInk
+                nodePaint.color = colorOnAccent
+                iconPaint.color = colorAccent
+                midDotPaint.color = colorOnAccent
+                packetPaint.color = colorOnAccent
+                ringPaint.color = colorOnAccent
             }
             LinkMode.HERO_CONNECTING -> {
-                trackPaint.color = Color.parseColor("#F4F5F2")
+                trackPaint.color = ContextCompat.getColor(context, R.color.label)
                 trackPaint.alpha = (255 * 0.25f).toInt()
                 trackPaint.pathEffect = DashPathEffect(floatArrayOf(2f, 7f), 0f)
 
-                wirePaint.color = colorLime
+                wirePaint.color = colorAccent
                 wirePaint.alpha = 255
 
-                nodePaint.color = colorHeroIdleNode
-                iconPaint.color = colorMuted
-                midDotPaint.color = colorLime
-                packetPaint.color = colorLime
-                ringPaint.color = colorLime
+                nodePaint.color = colorFill
+                iconPaint.color = colorTertiaryLabel
+                midDotPaint.color = colorAccent
+                packetPaint.color = colorAccent
+                ringPaint.color = colorAccent
             }
             LinkMode.HERO_IDLE -> {
-                trackPaint.color = Color.parseColor("#F4F5F2")
+                trackPaint.color = ContextCompat.getColor(context, R.color.label)
                 trackPaint.alpha = (255 * 0.25f).toInt()
                 trackPaint.pathEffect = DashPathEffect(floatArrayOf(2f, 7f), 0f)
 
-                nodePaint.color = colorHeroIdleNode
-                iconPaint.color = colorMuted
+                nodePaint.color = colorFill
+                iconPaint.color = colorTertiaryLabel
                 wirePaint.color = Color.TRANSPARENT
                 packetPaint.color = Color.TRANSPARENT
             }
             LinkMode.PAIRING_IDLE -> {
-                trackPaint.color = colorLine2
+                trackPaint.color = colorSeparator
                 trackPaint.alpha = 255
                 trackPaint.pathEffect = DashPathEffect(floatArrayOf(2f, 7f), 0f)
 
-                nodePaint.color = colorPairingNode
-                iconPaint.color = colorMuted
-                midDotPaint.color = colorCoral
+                nodePaint.color = colorCard
+                iconPaint.color = colorTertiaryLabel
+                midDotPaint.color = colorRed
                 midDotScale = 1f
                 wirePaint.color = Color.TRANSPARENT
                 packetPaint.color = Color.TRANSPARENT
             }
             LinkMode.PAIRING_CONNECTING -> {
-                trackPaint.color = colorLine2
+                trackPaint.color = colorSeparator
                 trackPaint.alpha = 255
                 trackPaint.pathEffect = DashPathEffect(floatArrayOf(2f, 7f), 0f)
 
-                wirePaint.color = colorLime
+                wirePaint.color = colorAccent
                 wirePaint.alpha = 255
 
-                nodePaint.color = colorPairingNode
-                iconPaint.color = colorMuted
-                packetPaint.color = colorLime
+                nodePaint.color = colorCard
+                iconPaint.color = colorTertiaryLabel
+                packetPaint.color = colorAccent
                 midDotScale = 0f
             }
             LinkMode.PAIRING_CONNECTED -> {
-                trackPaint.color = colorLine2
+                trackPaint.color = colorSeparator
                 trackPaint.alpha = (255 * 0.25f).toInt()
                 trackPaint.pathEffect = DashPathEffect(floatArrayOf(2f, 7f), 0f)
 
-                wirePaint.color = colorLime
+                wirePaint.color = colorAccent
                 wirePaint.alpha = 255
 
-                nodePaint.color = colorPairingNode
-                iconPaint.color = colorLime
-                midDotPaint.color = colorLime
-                packetPaint.color = colorLime
-                ringPaint.color = colorLime
+                nodePaint.color = colorCard
+                iconPaint.color = colorAccent
+                midDotPaint.color = colorAccent
+                packetPaint.color = colorAccent
+                ringPaint.color = colorAccent
             }
         }
     }
