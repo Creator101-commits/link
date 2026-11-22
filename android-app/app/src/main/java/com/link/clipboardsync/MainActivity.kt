@@ -25,6 +25,7 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
+import android.text.InputType
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -41,6 +42,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -55,6 +60,10 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         const val TAB_HOME = 0
         const val TAB_FILES = 1
         const val TAB_SETTINGS = 2
+        /** True while MainActivity is resumed — lets share/hotspot features
+         *  launch their intents directly instead of via a notification. */
+        @Volatile var isResumed = false
+            private set
     }
 
     // Header views
@@ -140,6 +149,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     private lateinit var tvSaveLocationPath: TextView
     private lateinit var btnResetSaveLocation: TextView
     private lateinit var btnChangeSaveLocation: TextView
+    private lateinit var rowPersonalHotspot: LinearLayout
+    private lateinit var tvHotspotName: TextView
     private lateinit var rowSettingNotifAccess: LinearLayout
     private lateinit var tvSettingNotifAccessStatus: TextView
     private lateinit var rowSettingAccessibility: LinearLayout
@@ -341,6 +352,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
     override fun onResume() {
         super.onResume()
+        isResumed = true
         ClipboardSyncManager.init(this)
         ClipboardSyncManager.addHistoryListener(this)
         ClipboardSyncManager.networkClient?.addListener(this)
@@ -363,6 +375,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
     override fun onPause() {
         super.onPause()
+        isResumed = false
         ClipboardSyncManager.networkClient?.removeListener(this)
         ClipboardSyncManager.removeHistoryListener(this)
         BridgeNotificationManager.removeSettingsListener(this)
@@ -449,6 +462,8 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
         tvSaveLocationPath = findViewById(R.id.tvSaveLocationPath)
         btnResetSaveLocation = findViewById(R.id.btnResetSaveLocation)
         btnChangeSaveLocation = findViewById(R.id.btnChangeSaveLocation)
+        rowPersonalHotspot = findViewById(R.id.rowPersonalHotspot)
+        tvHotspotName = findViewById(R.id.tvHotspotName)
         switchAutoAcceptFiles = findViewById(R.id.switchAutoAcceptFiles)
         switchFastLink = findViewById(R.id.switchFastLink)
         switchSkipSilent = findViewById(R.id.switchSkipSilent)
@@ -560,38 +575,51 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
         // 2. Animate the sliding indicator pill across 3 tabs
         navPillAnimator?.cancel()
-        val segmentWidth = navTabHome.width.toFloat().coerceAtLeast(1f)
-        val indicatorWidth = viewNavActiveIndicator.width.toFloat().coerceAtLeast(1f)
-        val targetX = segmentWidth * tabIndex + (segmentWidth - indicatorWidth) / 2f
+        // Before first layout navTabHome.width is 0 (e.g. cold start with
+        // open_tab=settings) — targetX would collapse to ~0 and the pill would
+        // stick under Home. Defer to after layout and set it directly.
+        if (navTabHome.width == 0) {
+            // navTabHome is the width source — when IT lays out its width is
+            // final, so position the pill then (indicator may lay out earlier).
+            navTabHome.doOnLayout {
+                val sw = navTabHome.width.toFloat().coerceAtLeast(1f)
+                val iw = viewNavActiveIndicator.width.toFloat().coerceAtLeast(1f)
+                viewNavActiveIndicator.translationX = sw * tabIndex + (sw - iw) / 2f
+            }
+        } else {
+            val segmentWidth = navTabHome.width.toFloat()
+            val indicatorWidth = viewNavActiveIndicator.width.toFloat().coerceAtLeast(1f)
+            val targetX = segmentWidth * tabIndex + (segmentWidth - indicatorWidth) / 2f
 
-        val slideAnim = ObjectAnimator.ofFloat(
-            viewNavActiveIndicator,
-            "translationX",
-            viewNavActiveIndicator.translationX,
-            targetX
-        ).apply {
-            duration = 320
-            interpolator = OvershootInterpolator(0.95f)
-        }
-        val stretchXAnim = ObjectAnimator.ofFloat(
-            viewNavActiveIndicator,
-            "scaleX",
-            1.0f, 1.15f, 0.97f, 1.0f
-        ).apply {
-            duration = 320
-            interpolator = AccelerateDecelerateInterpolator()
-        }
-        val squashYAnim = ObjectAnimator.ofFloat(
-            viewNavActiveIndicator,
-            "scaleY",
-            1.0f, 0.92f, 1.02f, 1.0f
-        ).apply {
-            duration = 320
-            interpolator = AccelerateDecelerateInterpolator()
-        }
-        navPillAnimator = AnimatorSet().apply {
-            playTogether(slideAnim, stretchXAnim, squashYAnim)
-            start()
+            val slideAnim = ObjectAnimator.ofFloat(
+                viewNavActiveIndicator,
+                "translationX",
+                viewNavActiveIndicator.translationX,
+                targetX
+            ).apply {
+                duration = 320
+                interpolator = OvershootInterpolator(0.95f)
+            }
+            val stretchXAnim = ObjectAnimator.ofFloat(
+                viewNavActiveIndicator,
+                "scaleX",
+                1.0f, 1.15f, 0.97f, 1.0f
+            ).apply {
+                duration = 320
+                interpolator = AccelerateDecelerateInterpolator()
+            }
+            val squashYAnim = ObjectAnimator.ofFloat(
+                viewNavActiveIndicator,
+                "scaleY",
+                1.0f, 0.92f, 1.02f, 1.0f
+            ).apply {
+                duration = 320
+                interpolator = AccelerateDecelerateInterpolator()
+            }
+            navPillAnimator = AnimatorSet().apply {
+                playTogether(slideAnim, stretchXAnim, squashYAnim)
+                start()
+            }
         }
 
         // 3. Subtle spring pop on the newly selected tab icon
@@ -746,6 +774,10 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
 
         rowSaveLocation.setOnClickListener {
             chooseSaveDirLauncher.launch(null)
+        }
+
+        rowPersonalHotspot.setOnClickListener {
+            showHotspotDialog()
         }
 
         btnResetSaveLocation.setOnClickListener {
@@ -1139,6 +1171,9 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 tvSaveLocationPath.text = "Downloads (/storage/emulated/0/Download)"
                 btnResetSaveLocation.visibility = View.GONE
             }
+
+            tvHotspotName.text = if (demoMode) "Pixel 8 Hotspot"
+                else BridgePrefs.getHotspotName(this) ?: "Not set up"
 
             if (isNotificationServiceEnabled()) {
                 tvSettingNotifAccessStatus.text = "Active"
@@ -2019,5 +2054,38 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
                 startActivity(intent)
             }
         } catch (ignored: Exception) {}
+    }
+
+    // MARK: - Personal hotspot setup dialog
+
+    private fun showHotspotDialog() {
+        val view = layoutInflater.inflate(R.layout.dialog_hotspot, null)
+        val etName = view.findViewById<EditText>(R.id.etHotspotName)
+        val tilPassword = view.findViewById<TextInputLayout>(R.id.tilHotspotPassword)
+        val etPassword = view.findViewById<TextInputEditText>(R.id.etHotspotPassword)
+        etName.setText(BridgePrefs.getHotspotName(this) ?: "")
+        etPassword.setText(BridgePrefs.getHotspotPassword(this) ?: "")
+        // Show/hide password toggle.
+        tilPassword.setEndIconOnClickListener {
+            val showing = etPassword.inputType and InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD != 0
+            etPassword.inputType = if (showing)
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            else
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            etPassword.setSelection(etPassword.text?.length ?: 0)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Personal hotspot")
+            .setView(view)
+            .setPositiveButton("Save") { _, _ ->
+                val name = etName.text.toString().trim()
+                val pass = etPassword.text.toString()
+                if (name.isNotEmpty() && pass.isNotEmpty()) {
+                    BridgePrefs.setHotspot(this, name, pass)
+                    updateSettingsUI()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 }

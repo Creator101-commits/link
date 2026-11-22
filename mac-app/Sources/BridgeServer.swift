@@ -1338,6 +1338,16 @@ class BridgeServer {
             return
         }
 
+        if type.hasPrefix("wifi_") {
+            DispatchQueue.main.async { BridgeWifiShare.shared.handleAck(jsonObject) }
+            return
+        }
+
+        if type.hasPrefix("hotspot_") {
+            DispatchQueue.main.async { BridgePhoneInternet.shared.handleStatus(jsonObject) }
+            return
+        }
+
         if type.hasPrefix("file_") {
             let devName = self.clientDeviceNames[id] ?? "Android Device"
             BridgeFileTransferManager.shared.handleControlMessage(jsonObject, fromDeviceId: id, deviceName: devName)

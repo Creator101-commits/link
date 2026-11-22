@@ -611,3 +611,38 @@ class CallStateMachineTest {
         assertTrue(m.onOffhook(1L).isNotEmpty()) // outgoing still emits active
     }
 }
+
+class PhaseBFeatureTest {
+    private fun json(s: String) = org.json.JSONObject(s)
+
+    @Test fun wifiShareValidWpa2() {
+        val r = BridgeWifiShare.WifiShareRequest.fromJson(
+            json("""{"ssid":"Home","password":"password123","security":"wpa2"}"""))
+        assertEquals("Home", r?.ssid); assertEquals("wpa2", r?.security)
+    }
+    @Test fun wifiShareValidWpa3OpenWep() {
+        assertEquals("wpa3", BridgeWifiShare.WifiShareRequest.fromJson(
+            json("""{"ssid":"A","password":"password123","security":"wpa3"}"""))?.security)
+        assertEquals("open", BridgeWifiShare.WifiShareRequest.fromJson(
+            json("""{"ssid":"A","password":"","security":"open"}"""))?.security)
+        assertEquals("wep", BridgeWifiShare.WifiShareRequest.fromJson(
+            json("""{"ssid":"A","password":"abc","security":"wep"}"""))?.security)
+    }
+    @Test fun wifiShareRejectsBad() {
+        // 33-byte SSID -> null
+        assertNull(BridgeWifiShare.WifiShareRequest.fromJson(
+            json("""{"ssid":"${"a".repeat(33)}","password":"password123","security":"wpa2"}""")))
+        // 7-char wpa2 password -> null
+        assertNull(BridgeWifiShare.WifiShareRequest.fromJson(
+            json("""{"ssid":"A","password":"short12","security":"wpa2"}""")))
+        // unknown security -> null
+        assertNull(BridgeWifiShare.WifiShareRequest.fromJson(
+            json("""{"ssid":"A","password":"password123","security":"enterprise"}""")))
+    }
+    @Test fun apStateMapping() {
+        assertEquals("on", BridgeHotspotShare.apState(13))
+        assertEquals("off", BridgeHotspotShare.apState(11))
+        assertNull(BridgeHotspotShare.apState(0))
+        assertNull(BridgeHotspotShare.apState(10))
+    }
+}

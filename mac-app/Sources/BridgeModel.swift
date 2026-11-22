@@ -111,6 +111,12 @@ class BridgeModel: ObservableObject {
             BridgeCallManager.shared.sendJsonHandler = { [weak self] json in
                 self?.server.broadcastRawJson(json)
             }
+            BridgeWifiShare.shared.sendJsonHandler = { [weak self] json in
+                self?.server.broadcastRawJson(json)
+            }
+            BridgePhoneInternet.shared.sendJsonHandler = { [weak self] json in
+                self?.server.broadcastRawJson(json)
+            }
         }
         server.onStatusChanged = { [weak self] connected, device in
             DispatchQueue.main.async {

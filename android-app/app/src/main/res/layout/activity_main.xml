@@ -1356,6 +1356,60 @@
                     android:layout_height="1dp"
                     android:background="@color/separator" />
 
+                <!-- Personal Hotspot Row -->
+                <LinearLayout
+                    android:id="@+id/rowPersonalHotspot"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Personal hotspot"
+                            android:textColor="@color/label"
+                            android:fontFamily="@font/sf_pro_text"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:id="@+id/tvHotspotName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Not set up"
+                            android:textColor="@color/secondary_label"
+                            android:fontFamily="@font/sf_pro_text"
+                            android:textSize="12.5sp"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:contentDescription="Personal hotspot"
+                        android:src="@drawable/sf_chevron_right"
+                        app:tint="@color/tertiary_label" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/separator" />
+
                 <!-- Notification Listener Permission Row -->
                 <LinearLayout
                     android:id="@+id/rowSettingNotifAccess"

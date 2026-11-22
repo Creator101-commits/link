@@ -64,6 +64,10 @@ final class BridgeFastLinkManager: ObservableObject {
     // Session state — fastLinkQueue only.
     private var state: LinkState = .idle
 
+    /// True while a fast-link session is joining/ready/restoring (blocks other
+    /// Wi-Fi switching like phone-internet).
+    var isActive: Bool { state != .idle }
+
     /// Short human-readable state for UI display ("Idle", "Joining…", "Hotspot", "Restoring…").
     var stateDescription: String {
         switch state {
@@ -99,6 +103,14 @@ final class BridgeFastLinkManager: ObservableObject {
     func requestLocationAuthorizationIfNeeded() {
         guard isFastLinkEnabled,
               CLLocationManager.authorizationStatus() == .notDetermined else { return }
+        requestLocationAuthorization()
+    }
+
+    /// Unconditional Location request for reading the Wi-Fi SSID (used by
+    /// Wi-Fi password sharing even when fast transfers are off). No-op unless
+    /// status is .notDetermined.
+    func requestLocationAuthorization() {
+        guard CLLocationManager.authorizationStatus() == .notDetermined else { return }
         DispatchQueue.main.async { [weak self] in
             self?.locationManager.requestWhenInUseAuthorization()
         }
@@ -159,6 +171,12 @@ final class BridgeFastLinkManager: ObservableObject {
     private func handleOffer(_ offer: Offer, deviceId: UUID) {
         guard isFastLinkEnabled else {
             replyFailed(deviceId: deviceId, session: offer.session, reason: "disabled")
+            return
+        }
+        // Don't hijack Wi-Fi while the phone's hotspot is being used for
+        // internet — Android falls back on a failed reply.
+        if BridgePhoneInternet.isConnectedFlag {
+            replyFailed(deviceId: deviceId, session: offer.session, reason: "phone_internet_active")
             return
         }
         guard let iface = wifiClient.interface(), let interfaceName = iface.interfaceName else {

@@ -11,6 +11,8 @@ Visual reference captures for the Bridge rebrand (see `../DESIGN.md`). Mac shots
 - `mac-settings-light.png` / `mac-settings-dark.png` — settings screen
 - `mac-call-ringing-light.png` / `mac-call-ringing-dark.png` — incoming call card pinned above the tab strip (Mom, Answer/Decline) with phone status
 - `mac-apps-settings-light.png` / `mac-apps-settings-dark.png` — Settings APPS section: per-app notification level pickers
+- `mac-wifi-share-light.png` / `mac-wifi-share-dark.png` — Actions card: "Share Wi-Fi password" in sent state
+- `mac-phone-internet-light.png` / `mac-phone-internet-dark.png` — Actions card: "Use phone's internet" connected to "Pixel 8 Hotspot" with Disconnect
 
 Note: captured via `cacheDisplay` fallback (Screen Recording permission not granted to the capture process), so popover vibrancy/materials render as the window background color rather than live material.
 
@@ -20,4 +22,5 @@ Note: captured via `cacheDisplay` fallback (Screen Recording permission not gran
 - `android-home-light.png` / `android-home-dark.png` — connected home tab
 - `android-files-light.png` / `android-files-dark.png` — files tab with active/completed/failed sample transfers
 - `android-files-empty-light.png` / `android-files-empty-dark.png` — files tab empty state
-- `android-settings-light.png` / `android-settings-dark.png` — settings tab
+- `android-settings-light.png` / `android-settings-dark.png` — settings tab (active tab pill under Settings)
+- `android-settings-hotspot-light.png` / `android-settings-hotspot-dark.png` — settings scrolled to the Personal hotspot row ("Pixel 8 Hotspot")

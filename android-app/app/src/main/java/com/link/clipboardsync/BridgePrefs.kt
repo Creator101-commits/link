@@ -26,6 +26,8 @@ object BridgePrefs {
     private const val KEY_FAST_LINK_ENABLED = "fast_link_enabled"
     private const val KEY_SKIP_SILENT_NOTIFICATIONS = "skip_silent_notifications"
     private const val KEY_APP_NOTIFICATION_RULES = "app_notification_rules_json"
+    private const val KEY_HOTSPOT_NAME = "hotspot_name"
+    private const val KEY_HOTSPOT_PASSWORD = "hotspot_password"
 
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -237,4 +239,21 @@ object BridgePrefs {
             obj.keys().asSequence().associateWith { obj.optString(it) }
         }.getOrElse { emptyMap() }
     }
+
+    // Phone-hotspot sharing (local-only; never synced).
+    fun getHotspotName(context: Context): String? =
+        prefs(context).getString(KEY_HOTSPOT_NAME, null)?.ifBlank { null }
+
+    fun getHotspotPassword(context: Context): String? =
+        prefs(context).getString(KEY_HOTSPOT_PASSWORD, null)?.ifBlank { null }
+
+    fun setHotspot(context: Context, name: String?, password: String?) {
+        prefs(context).edit()
+            .putString(KEY_HOTSPOT_NAME, name ?: "")
+            .putString(KEY_HOTSPOT_PASSWORD, password ?: "")
+            .apply()
+    }
+
+    fun isHotspotConfigured(context: Context): Boolean =
+        !getHotspotName(context).isNullOrEmpty() && !getHotspotPassword(context).isNullOrEmpty()
 }

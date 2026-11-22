@@ -958,6 +958,9 @@ struct BridgeMenuView: View {
                     }
                 }
 
+                // Actions card — Wi-Fi password share + phone internet
+                actionsCard
+
                 // Pair another device
                 Button(action: { model.showPairingSection.toggle() }) {
                     HStack(spacing: 6) {
@@ -1020,6 +1023,136 @@ struct BridgeMenuView: View {
             }
         }
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Actions card (Wi-Fi share + phone internet)
+
+    @ObservedObject private var wifiShare = BridgeWifiShare.shared
+    @ObservedObject private var phoneInternet = BridgePhoneInternet.shared
+
+    private var actionsCard: some View {
+        BridgeCard {
+            VStack(spacing: 0) {
+                actionRow(
+                    icon: "wifi",
+                    title: "Share Wi-Fi password",
+                    subtitle: wifiShareSubtitle,
+                    enabled: model.isConnected && wifiShareRowEnabled,
+                    trailing: { wifiShareTrailing },
+                    action: wifiShareAction
+                )
+                deviceHairline
+                actionRow(
+                    icon: "personalhotspot",
+                    title: "Use phone's internet",
+                    subtitle: phoneInternetSubtitle,
+                    enabled: model.isConnected && phoneInternet.state != .joining,
+                    trailing: { phoneInternetTrailing },
+                    action: phoneInternetAction
+                )
+            }
+        }
+        .onAppear { wifiShare.refreshSSID() }
+    }
+
+    private var wifiShareSubtitle: String {
+        switch wifiShare.state {
+        case .reading: return "Reading password…"
+        case .sent: return "Sent to your phone"
+        case .failed(let msg): return msg
+        case .unsupported(let msg): return msg
+        case .idle:
+            if wifiShare.needsLocationForSSID {
+                return "Allow Location to read the Wi-Fi name"
+            }
+            return wifiShare.currentSSID ?? "Not on Wi-Fi"
+        }
+    }
+
+    private var wifiShareRowEnabled: Bool {
+        if wifiShare.state == .reading { return false }
+        // Enabled when we have an SSID, or when Location is the only blocker.
+        return wifiShare.currentSSID != nil || wifiShare.needsLocationForSSID
+    }
+
+    private func wifiShareAction() {
+        if wifiShare.needsLocationForSSID && wifiShare.currentSSID == nil {
+            wifiShare.handleLocationPrompt()
+            return
+        }
+        wifiShare.sharePassword()
+    }
+
+    @ViewBuilder private var wifiShareTrailing: some View {
+        switch wifiShare.state {
+        case .reading:
+            ProgressView().scaleEffect(0.6).frame(width: 16, height: 16)
+        case .sent:
+            Image(systemName: "checkmark.circle.fill").foregroundColor(.bridgeGreen).font(.system(size: 14))
+        default:
+            Image(systemName: "chevron.right").font(.system(size: 11)).foregroundColor(.secondary.opacity(0.5))
+        }
+    }
+
+    private var phoneInternetSubtitle: String {
+        switch phoneInternet.state {
+        case .idle: return "Turns on your phone's hotspot"
+        case .waitingForPhone: return "Waiting for your phone…"
+        case .needsSetup: return "Set your hotspot name and password in Bridge on your phone"
+        case .joining: return "Joining…"
+        case .connected(let ssid): return "Connected to \(ssid)"
+        case .failed(let msg): return msg
+        }
+    }
+
+    @ViewBuilder private var phoneInternetTrailing: some View {
+        switch phoneInternet.state {
+        case .waitingForPhone:
+            Button("Cancel") { phoneInternet.cancel() }
+                .font(.system(size: 11, weight: .medium)).buttonStyle(.plain).foregroundColor(.secondary)
+        case .connected:
+            Button("Disconnect") { phoneInternet.disconnect() }
+                .font(.system(size: 11, weight: .medium)).buttonStyle(.plain).foregroundColor(.red)
+        case .joining:
+            ProgressView().scaleEffect(0.6).frame(width: 16, height: 16)
+        default:
+            Image(systemName: "chevron.right").font(.system(size: 11)).foregroundColor(.secondary.opacity(0.5))
+        }
+    }
+
+    private func phoneInternetAction() {
+        switch phoneInternet.state {
+        case .idle, .failed: phoneInternet.request()
+        case .needsSetup: break // user must set up on the phone
+        default: break
+        }
+    }
+
+    private func actionRow(icon: String, title: String, subtitle: String, enabled: Bool,
+                           @ViewBuilder trailing: () -> some View, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.primary.opacity(0.08))
+                        .frame(width: 28, height: 28)
+                    Image(systemName: icon)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 12, weight: .medium)).foregroundColor(.primary)
+                    Text(subtitle).font(.system(size: 10)).foregroundColor(.secondary).lineLimit(1)
+                }
+                Spacer()
+                trailing()
+            }
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.5)
     }
 
     private func deviceLine(icon: String, name: String, subtitle: String, statusColor: Color, onUnpair: (() -> Void)?, ipReveal: AnyView? = nil) -> some View {

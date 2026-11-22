@@ -128,7 +128,12 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
     }
 
     override fun onConnectionStatusChanged(isConnected: Boolean, host: String?) {
-        if (isConnected) BridgeDeviceStatus.onLinkReady() else BridgeDeviceStatus.onLinkLost()
+        if (isConnected) {
+            BridgeDeviceStatus.onLinkReady()
+            BridgeHotspotShare.onLinkReady(this)
+        } else {
+            BridgeDeviceStatus.onLinkLost()
+        }
         mainHandler.post {
             val name = BridgePrefs.macName(this) ?: "Mac"
             val isActivelyConnecting = ClipboardSyncManager.networkClient?.isActivelyConnecting() == true

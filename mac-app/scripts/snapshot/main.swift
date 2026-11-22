@@ -93,6 +93,30 @@ case "call-ringing":
             direction: "incoming", startedAt: nil
         )
     }
+case "wifi-share":
+    model.pairedDevice = "Pixel 8"
+    model.connectedDevice = "Pixel 8"
+    model.isConnected = true
+    model.selectedTab = .devices
+    MainActor.assumeIsolated {
+        injectPhaseAState()
+        BridgeWifiShare.shared.freezeSSIDForSnapshots = true
+        BridgeWifiShare.shared.currentSSID = "HomeNetwork-5G"
+        BridgeWifiShare.shared.state = .sent(ssid: "HomeNetwork-5G")
+        BridgePhoneInternet.shared.state = .idle
+    }
+case "phone-internet":
+    model.pairedDevice = "Pixel 8"
+    model.connectedDevice = "Pixel 8"
+    model.isConnected = true
+    model.selectedTab = .devices
+    MainActor.assumeIsolated {
+        injectPhaseAState()
+        BridgeWifiShare.shared.freezeSSIDForSnapshots = true
+        BridgeWifiShare.shared.currentSSID = "HomeNetwork-5G"
+        BridgePhoneInternet.shared.state = .connected(ssid: "Pixel 8 Hotspot")
+        BridgeWifiShare.shared.state = .idle
+    }
 default:
     FileHandle.standardError.write("unknown screen: \(screen)\n".data(using: .utf8)!)
     exit(2)

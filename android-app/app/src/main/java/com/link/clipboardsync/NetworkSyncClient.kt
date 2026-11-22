@@ -737,6 +737,10 @@ class NetworkSyncClient(private val context: Context) {
                                     // reserved prefix for symmetry with the Mac router.
                                 } else if (innerType != null && innerType.startsWith("call_")) {
                                     BridgeCallMonitor.handleControlMessage(context, innerObj)
+                                } else if (innerType != null && innerType.startsWith("wifi_share") && innerObj != null) {
+                                    BridgeWifiShare.handle(context, innerObj)
+                                } else if (innerType != null && innerType.startsWith("hotspot_") && innerObj != null) {
+                                    BridgeHotspotShare.handleControlMessage(context, innerObj)
                                 } else if (innerType != null && (innerType.startsWith("notif_") || innerType == "settings_sync")) {
                                     notifyNotificationPayloadReceived(decryptedJsonString)
                                 } else if (innerType != null && innerType.startsWith("file_") && innerObj != null) {

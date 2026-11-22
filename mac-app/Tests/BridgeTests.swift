@@ -668,6 +668,26 @@ private func runAdaptiveAndIconCacheTests() {
 }
 
 
+private func runPhaseBFeatureTests() {
+    // securityLabel mapping
+    expect(BridgeWifiShare.securityLabel(.wpa3Personal) == "wpa3", "wpa3Personal -> wpa3")
+    expect(BridgeWifiShare.securityLabel(.wpa3Transition) == "wpa3", "wpa3Transition -> wpa3")
+    expect(BridgeWifiShare.securityLabel(.wpa2Personal) == "wpa2", "wpa2Personal -> wpa2")
+    expect(BridgeWifiShare.securityLabel(.wpaPersonal) == "wpa2", "wpaPersonal -> wpa2")
+    expect(BridgeWifiShare.securityLabel(.none) == "open", "none -> open")
+    expect(BridgeWifiShare.securityLabel(.dynamicWEP) == "wep", "dynamicWEP -> wep")
+    expect(BridgeWifiShare.securityLabel(.wpaEnterprise) == nil
+        || BridgeWifiShare.securityLabel(.wpa2Enterprise) == nil
+        || BridgeWifiShare.securityLabel(.wpa3Enterprise) == nil, "enterprise -> nil")
+    // parseSecurityOutput
+    expect(BridgeWifiShare.parseSecurityOutput(Data("hunter2\n".utf8)) == "hunter2",
+        "parseSecurityOutput trims trailing newline")
+    expect(BridgeWifiShare.parseSecurityOutput(Data("\n".utf8)) == nil,
+        "parseSecurityOutput empty -> nil")
+    expect(BridgeWifiShare.parseSecurityOutput(Data("".utf8)) == nil,
+        "parseSecurityOutput empty data -> nil")
+}
+
 private func runPhaseAFeatureTests() {
     // lowBatteryDecision
     var r = BridgeDeviceStatus.lowBatteryDecision(level: 19, charging: false, threshold: 20, state: 0)
@@ -728,6 +748,7 @@ struct BridgeTestRunner {
         runFastLinkManagerTests()
         runNotificationScrollLayoutTests()
         runPhaseAFeatureTests()
+        runPhaseBFeatureTests()
         runAdaptiveAndIconCacheTests()
         do {
             try runPayloadAndVersionTests()
