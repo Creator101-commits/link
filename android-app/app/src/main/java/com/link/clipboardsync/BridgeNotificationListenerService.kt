@@ -155,6 +155,8 @@ class BridgeNotificationListenerService : NotificationListenerService() {
             pkg
         }
 
+        // Icon is cached per package; per-connection de-dup happens in
+        // BridgeNotificationManager.postToMac right before sending.
         val iconBase64 = getOrEncodeAppIcon(pkg)
 
         // Parse notification actions
@@ -542,7 +544,7 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         return try {
             val drawable = packageManager.getApplicationIcon(packageName)
             val bitmap = drawableToBitmap(drawable) ?: return null
-            val scaled = Bitmap.createScaledBitmap(bitmap, 72, 72, true)
+            val scaled = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
             val stream = ByteArrayOutputStream()
             scaled.compress(Bitmap.CompressFormat.PNG, 85, stream)
             val base64 = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
@@ -557,8 +559,8 @@ class BridgeNotificationListenerService : NotificationListenerService() {
         if (drawable is BitmapDrawable && drawable.bitmap != null) {
             return drawable.bitmap
         }
-        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 72
-        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 72
+        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 128
+        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 128
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         drawable.setBounds(0, 0, canvas.width, canvas.height)

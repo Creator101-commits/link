@@ -30,7 +30,7 @@ $(APP_NAME): $(SWIFT_SOURCES) Info.plist ShareExtension/Info.plist ShareExtensio
 		"$$ACTOOL" Resources/Bridge.icon --compile .build-icon --platform macosx --minimum-deployment-target $(MACOS_MIN) --app-icon Bridge --output-partial-info-plist .build-icon/partial.plist >/dev/null 2>&1 && cp .build-icon/Assets.car $(RESOURCES)/Assets.car || true; \
 		rm -rf .build-icon; \
 	fi
-	swiftc $(SWIFT_SOURCES) -o $(MACOS)/Bridge -framework AppKit -framework SwiftUI -framework Network -framework CryptoKit -framework CoreImage -framework CoreText -framework UserNotifications -framework ApplicationServices -framework UniformTypeIdentifiers -framework CoreBluetooth -framework CoreWLAN -framework CoreLocation $(SWIFT_TARGET) -O
+	swiftc $(SWIFT_SOURCES) -o $(MACOS)/Bridge -wmo -framework AppKit -framework SwiftUI -framework Network -framework CryptoKit -framework CoreImage -framework CoreText -framework UserNotifications -framework ApplicationServices -framework UniformTypeIdentifiers -framework CoreBluetooth -framework CoreWLAN -framework CoreLocation $(SWIFT_TARGET) -O
 	@cp ShareExtension/Info.plist $(SHARE_APPEX)/Contents/Info.plist
 	@cp Resources/Bridge.icns $(SHARE_APPEX)/Contents/Resources/Bridge.icns 2>/dev/null || true
 	swiftc ShareExtension/ShareController.swift -module-name BridgeShare -o $(SHARE_APPEX)/Contents/MacOS/BridgeShare -framework AppKit -framework Foundation -framework UniformTypeIdentifiers -Xlinker -e -Xlinker _NSExtensionMain $(SWIFT_TARGET) -O

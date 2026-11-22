@@ -28,7 +28,7 @@ class BridgeFileTransferManager: ObservableObject {
     private static let chunkSize = 64 * 1024 // 64 KB chunk size for hardware-accelerated AES-GCM framing
     private static let hashChunkSize = 1024 * 1024 // 1 MB
     private static let minFreeDiskSpaceMargin: Int64 = 100 * 1024 * 1024 // 100 MB safety buffer
-    private static let maxConcurrentChunksInFlight = 4 // Keep TCP pipeline full without blocking on completion
+    private static let maxConcurrentChunksInFlight = 16 // Keep TCP pipeline full without blocking on completion
 
     @Published var customSavePath: String? {
         didSet {
@@ -124,6 +124,7 @@ class BridgeFileTransferManager: ObservableObject {
         var bytesSinceLastSpeedCalc: Int64 = 0
         var chunksInFlight: Int = 0
         var incomingBuffer: Data = Data()
+        var lastProgressDispatchAt: TimeInterval = 0
     }
 
     private var activeSessions = [String: ActiveSession]()
@@ -149,6 +150,32 @@ class BridgeFileTransferManager: ObservableObject {
 
     static func computeDataSocketAuth(token: String, transferId: String, offset: Int64) -> String {
         return computeSHA256("bridge-file-auth-v1:\(token):\(transferId):\(offset)")
+    }
+
+    /// Parses complete encrypted frames from `buf`, which may be a Data slice
+    /// with a non-zero startIndex — all indexing is relative to startIndex.
+    /// Returns each frame's payload (the bytes starting at its 12-byte IV,
+    /// i.e. the AES.GCM "combined" representation), the number of input bytes
+    /// consumed, and whether a corrupt length prefix was encountered.
+    static func parseFrames(_ buf: Data, maxFrameLen: Int) -> (frames: [Data], consumed: Int, corrupt: Bool) {
+        var frames: [Data] = []
+        var pos = buf.startIndex
+        var consumed = 0
+        while buf.endIndex - pos >= 4 {
+            let frameLen = (Int(buf[pos]) << 24)
+                | (Int(buf[pos + 1]) << 16)
+                | (Int(buf[pos + 2]) << 8)
+                | Int(buf[pos + 3])
+            guard frameLen > 28 && frameLen <= maxFrameLen else {
+                return (frames, consumed, true)
+            }
+            let totalRequired = 4 + frameLen
+            guard buf.endIndex - pos >= totalRequired else { break }
+            frames.append(buf[(pos + 4)..<(pos + totalRequired)])
+            pos += totalRequired
+            consumed += totalRequired
+        }
+        return (frames, consumed, false)
     }
 
     // MARK: - Public Outgoing API (Mac -> Android)
@@ -442,10 +469,15 @@ class BridgeFileTransferManager: ObservableObject {
             }
             activeSessions[transferId] = session
 
-            DispatchQueue.main.async {
-                item.bytesTransferred = chunkBytesForTotal
-                if let spd = computedSpeed {
-                    item.speedBytesPerSec = spd
+            // Throttle progress UI updates to ~10/s; final values always dispatch.
+            if now - session.lastProgressDispatchAt >= 0.1 {
+                session.lastProgressDispatchAt = now
+                activeSessions[transferId] = session
+                DispatchQueue.main.async {
+                    item.bytesTransferred = chunkBytesForTotal
+                    if let spd = computedSpeed {
+                        item.speedBytesPerSec = spd
+                    }
                 }
             }
 
@@ -751,7 +783,7 @@ class BridgeFileTransferManager: ObservableObject {
             return
         }
 
-        conn.receive(minimumIncompleteLength: 1, maximumLength: Self.chunkSize + 1024) { [weak self] data, _, isComplete, error in
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, isComplete, error in
             guard let self = self else { return }
             guard var currentSession = self.activeSessions[transferId],
                   !currentSession.isCancelled,
@@ -762,24 +794,20 @@ class BridgeFileTransferManager: ObservableObject {
 
             var updatedBytes = currentBytes
             if let chunk = data, !chunk.isEmpty {
+                // Detach the dict's buffer copy first so append/parse below
+                // operates on uniquely-referenced storage (no per-callback CoW).
+                self.activeSessions[transferId]?.incomingBuffer = Data()
                 currentSession.incomingBuffer.append(chunk)
 
                 var decryptedBytesThisRound: Int64 = 0
-                while currentSession.incomingBuffer.count >= 4 {
-                    let frameLen = Int(currentSession.incomingBuffer.subdata(in: 0..<4).withUnsafeBytes { $0.load(as: UInt32.self).bigEndian })
-                    guard frameLen > 28 && frameLen <= (Self.chunkSize + 2048) else {
-                        self.failTransfer(item: item, reason: "Corrupted encrypted frame")
-                        return
-                    }
+                let buffered = currentSession.incomingBuffer
+                let parsed = Self.parseFrames(buffered, maxFrameLen: Self.chunkSize + 2048)
+                guard !parsed.corrupt else {
+                    self.failTransfer(item: item, reason: "Corrupted encrypted frame")
+                    return
+                }
 
-                    let totalRequired = 4 + frameLen
-                    if currentSession.incomingBuffer.count < totalRequired {
-                        break
-                    }
-
-                    let framePayload = currentSession.incomingBuffer.subdata(in: 4..<totalRequired)
-                    currentSession.incomingBuffer.removeSubrange(0..<totalRequired)
-
+                for framePayload in parsed.frames {
                     do {
                         let sealedBox = try AES.GCM.SealedBox(combined: framePayload)
                         let plaintext = try AES.GCM.open(sealedBox, using: currentSession.aesKey)
@@ -797,6 +825,11 @@ class BridgeFileTransferManager: ObservableObject {
                         return
                     }
                 }
+                // Drop the consumed prefix once per callback; the remainder is
+                // always smaller than one frame so this copies little.
+                currentSession.incomingBuffer = parsed.consumed == 0
+                    ? buffered
+                    : Data(buffered[(buffered.startIndex + parsed.consumed)...])
 
                 if decryptedBytesThisRound > 0 {
                     let now = Date().timeIntervalSince1970
@@ -809,10 +842,14 @@ class BridgeFileTransferManager: ObservableObject {
                         currentSession.bytesSinceLastSpeedCalc = 0
                     }
 
-                    DispatchQueue.main.async {
-                        item.bytesTransferred = updatedBytes
-                        if let spd = computedSpeed {
-                            item.speedBytesPerSec = spd
+                    // Throttle progress UI updates to ~10/s per transfer.
+                    if now - currentSession.lastProgressDispatchAt >= 0.1 {
+                        currentSession.lastProgressDispatchAt = now
+                        DispatchQueue.main.async {
+                            item.bytesTransferred = updatedBytes
+                            if let spd = computedSpeed {
+                                item.speedBytesPerSec = spd
+                            }
                         }
                     }
                 }

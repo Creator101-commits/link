@@ -124,11 +124,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         pop.animates = false
         pop.appearance = NSAppearance(named: .darkAqua)
         pop.delegate = self
-        let hostingController = NSHostingController(rootView: BridgeMenuView(model: model))
-        if #available(macOS 13.0, *) {
-            hostingController.sizingOptions = [.preferredContentSize]
-        }
-        pop.contentViewController = hostingController
+        // The NSHostingController is created lazily in showPopover and released
+        // in popoverDidClose so the SwiftUI view tree isn't kept alive while
+        // the popover is closed.
         self.popover = pop
         
         model.onSizeChangeRequested = { [weak self] in
@@ -202,6 +200,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func showPopover(forceBringToFront: Bool = false) {
         guard let button = statusItem?.button, let pop = popover else { return }
+        if pop.contentViewController == nil {
+            let hostingController = NSHostingController(rootView: BridgeMenuView(model: model))
+            if #available(macOS 13.0, *) {
+                hostingController.sizingOptions = [.preferredContentSize]
+            }
+            pop.contentViewController = hostingController
+        }
         BridgeNotificationManager.shared.checkNotificationAuth()
         applyPopoverSize()
 
@@ -344,6 +349,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         isFinishingAnimatedClose = false
         model.hideAllIpAddresses()
+        // Release the SwiftUI view tree while the popover is closed.
+        popover?.contentViewController = nil
     }
 
     // MARK: - Finder Right-Click / Share / Services / Open With Integration

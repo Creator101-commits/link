@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import ApplicationServices
 
-func logDebugAX(_ msg: String) {
+func logDebugAX(_ msg: @autoclosure () -> String) {
     // Do not write notification contents to world-readable /tmp files
 }
 
@@ -21,6 +21,8 @@ public class AXNotificationObserver: ObservableObject {
     private var activeCardElements = [String: AXUIElement]() // id -> AXUIElement
     private var pollSourceTimer: DispatchSourceTimer?
     private var tickCount = 0
+    /// Gates expensive window scanning; wired to phone-connection state.
+    public var shouldScan: () -> Bool = { true }
     private var iconCache = [String: String]()
 
     private init() {
@@ -72,7 +74,8 @@ public class AXNotificationObserver: ObservableObject {
 
         pollSourceTimer?.cancel()
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
-        timer.schedule(deadline: .now() + 0.5, repeating: 1.5)
+        // 3s period with 0.5s leeway: cheap idle polling, coalesced by the OS.
+        timer.schedule(deadline: .now() + 0.5, repeating: 3.0, leeway: .milliseconds(500))
         timer.setEventHandler { [weak self] in
             self?.periodicCheck()
         }
@@ -106,8 +109,12 @@ public class AXNotificationObserver: ObservableObject {
         }
 
         if trusted {
-            checkObserverHealth()
-            scanActiveNotificationWindows()
+            // Window scanning only pays off while a phone is connected;
+            // trust checks still run every tick.
+            if shouldScan() {
+                checkObserverHealth()
+                scanActiveNotificationWindows()
+            }
         }
     }
 

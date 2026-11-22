@@ -46,6 +46,7 @@ import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import javax.crypto.Cipher
+import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import kotlin.math.max
@@ -493,13 +494,13 @@ object BridgeFileTransferManager {
         var lastError: Exception? = null
         for (attempt in 0 until 3) {
             try {
-                val s = BridgeTransport.connect(ctx, dataHost, port, 5000)
+                val s = BridgeTransport.connect(ctx, dataHost, port, 3000)
                 return DataSocketResult(s, dataHost, false)
             } catch (e: Exception) {
                 lastError = e
                 if (attempt < 2) {
                     try {
-                        Thread.sleep(800)
+                        Thread.sleep(300)
                     } catch (_: InterruptedException) {
                         break
                     }
@@ -526,6 +527,7 @@ object BridgeFileTransferManager {
             var sock: Socket? = null
             var input: InputStream? = null
             var dataHost: String? = null
+            var wifiLockHeld = false
             try {
                 val rawInput: InputStream = if (item.isFolder && item.tempArchiveFile != null) {
                     FileInputStream(item.tempArchiveFile!!)
@@ -553,6 +555,10 @@ object BridgeFileTransferManager {
                 val conn = openDataSocket(appCtx, host, port)
                 dataHost = conn.acquiredHost
                 item.statusNote = null
+                if (!conn.viaBluetooth) {
+                    BridgeWifiLock.acquire(appCtx)
+                    wifiLockHeld = true
+                }
                 val s = conn.socket
                 s.tcpNoDelay = true
                 s.keepAlive = true
@@ -582,9 +588,11 @@ object BridgeFileTransferManager {
                 updateProgressNotification(context, item)
 
                 val aesKey = deriveAesKey(token)
+                val frameCipher = Cipher.getInstance("AES/GCM/NoPadding")
                 val secureRandom = SecureRandom()
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                 val buf = ByteArray(CHUNK_SIZE)
+                // Wire frame: [4B BE combinedLen][12B IV][ciphertext+16B tag].
+                val frame = ByteArray(4 + 12 + CHUNK_SIZE + 16)
                 var currentBytes = offset
                 var lastSpeedTime = System.currentTimeMillis()
                 var bytesSinceLastSpeed = 0L
@@ -595,24 +603,22 @@ object BridgeFileTransferManager {
                     if (pausedIds.contains(item.id) || cancelledIds.contains(item.id)) {
                         break
                     }
-                    val read = input.read(buf)
-                    if (read <= 0) break
+                    // Fill the plaintext buffer fully so frames are max-size.
+                    var filled = 0
+                    while (filled < CHUNK_SIZE) {
+                        val r = input.read(buf, filled, CHUNK_SIZE - filled)
+                        if (r <= 0) break
+                        filled += r
+                    }
+                    if (filled <= 0) break
 
                     val iv = ByteArray(12)
                     secureRandom.nextBytes(iv)
-                    cipher.init(Cipher.ENCRYPT_MODE, aesKey, GCMParameterSpec(128, iv))
-                    val ciphertextWithTag = cipher.doFinal(buf, 0, read)
+                    val frameBytes = encodeFrame(frameCipher, aesKey, buf, 0, filled, iv, frame)
+                    out.write(frame, 0, frameBytes)
 
-                    val combinedLen = 12 + ciphertextWithTag.size
-                    out.write((combinedLen ushr 24).toByte().toInt())
-                    out.write((combinedLen ushr 16).toByte().toInt())
-                    out.write((combinedLen ushr 8).toByte().toInt())
-                    out.write(combinedLen.toByte().toInt())
-                    out.write(iv)
-                    out.write(ciphertextWithTag)
-
-                    currentBytes += read
-                    bytesSinceLastSpeed += read
+                    currentBytes += filled
+                    bytesSinceLastSpeed += filled
                     item.bytesTransferred = currentBytes
 
                     val now = System.currentTimeMillis()
@@ -666,6 +672,7 @@ object BridgeFileTransferManager {
                 try { input?.close() } catch (_: Exception) {}
                 try { sock?.close() } catch (_: Exception) {}
                 dataHost?.let { BridgeFastLink.releaseDataHost(it) }
+                if (wifiLockHeld) BridgeWifiLock.release()
                 activeSockets.remove(item.id)
                 if (item.isFolder && (item.status.isFinished || cancelledIds.contains(item.id))) {
                     item.tempArchiveFile?.delete()
@@ -828,6 +835,7 @@ object BridgeFileTransferManager {
             var sock: Socket? = null
             var raf: RandomAccessFile? = null
             var dataHost: String? = null
+            var wifiLockHeld = false
             try {
                 val partDir = File(appCtx.cacheDir, "transfers").apply { if (!exists()) mkdirs() }
                 val partFile = item.partFile ?: File(partDir, "${item.id}.part").also {
@@ -851,6 +859,10 @@ object BridgeFileTransferManager {
                 val conn = openDataSocket(appCtx, host, port)
                 dataHost = conn.acquiredHost
                 item.statusNote = null
+                if (!conn.viaBluetooth) {
+                    BridgeWifiLock.acquire(appCtx)
+                    wifiLockHeld = true
+                }
                 val s = conn.socket
                 s.tcpNoDelay = true
                 s.keepAlive = true
@@ -882,8 +894,11 @@ object BridgeFileTransferManager {
 
                 val input = java.io.BufferedInputStream(s.getInputStream(), CHUNK_SIZE)
                 val aesKey = deriveAesKey(token)
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                val frameCipher = Cipher.getInstance("AES/GCM/NoPadding")
                 val headerBuf = ByteArray(4)
+                // Reused frame + plaintext buffers (allocated once per transfer).
+                val frameBuf = ByteArray(CHUNK_SIZE + 2048)
+                val plainBuf = ByteArray(CHUNK_SIZE)
                 var currentBytes = offset
                 var lastSpeedTime = System.currentTimeMillis()
                 var bytesSinceLastSpeed = 0L
@@ -905,22 +920,19 @@ object BridgeFileTransferManager {
                         throw SecurityException("Invalid encrypted frame length: $frameLen")
                     }
 
-                    val framePayload = ByteArray(frameLen)
-                    if (!readFully(input, framePayload, frameLen)) {
+                    if (!readFully(input, frameBuf, frameLen)) {
                         throw java.io.EOFException("Incomplete encrypted frame received")
                     }
 
-                    val spec = GCMParameterSpec(128, framePayload, 0, 12)
-                    cipher.init(Cipher.DECRYPT_MODE, aesKey, spec)
-                    val plaintext = cipher.doFinal(framePayload, 12, frameLen - 12)
+                    val n = decodeFrame(frameCipher, aesKey, frameBuf, 0, frameLen, plainBuf)
 
-                    if (currentBytes + plaintext.size > item.fileSize) {
+                    if (currentBytes + n > item.fileSize) {
                         throw SecurityException("Received bytes exceeded declared file size")
                     }
 
-                    raf.write(plaintext)
-                    currentBytes += plaintext.size
-                    bytesSinceLastSpeed += plaintext.size
+                    raf.write(plainBuf, 0, n)
+                    currentBytes += n
+                    bytesSinceLastSpeed += n
                     item.bytesTransferred = currentBytes
 
                     val now = System.currentTimeMillis()
@@ -1071,6 +1083,7 @@ object BridgeFileTransferManager {
                 try { raf?.close() } catch (_: Exception) {}
                 try { sock?.close() } catch (_: Exception) {}
                 dataHost?.let { BridgeFastLink.releaseDataHost(it) }
+                if (wifiLockHeld) BridgeWifiLock.release()
                 activeSockets.remove(item.id)
             }
         }
@@ -1729,4 +1742,45 @@ object BridgeFileTransferManager {
         if (gb < 1.0) return String.format("%.1f MB", mb)
         return String.format("%.2f GB", gb)
     }
+}
+
+// MARK: - Wire frame codec (unit tested)
+//
+// Frame layout on the wire:
+//   [0..3]   uint32 BE combinedLen = 12 (IV) + ciphertextAndTag length
+//   [4..15]  12-byte IV
+//   [16..]   AES-256-GCM ciphertext + 16-byte tag
+// encodeFrame writes the whole frame into [out] and returns bytes used
+// (16 + ctLen). decodeFrame expects [frame] to start at the IV.
+
+internal fun encodeFrame(
+    cipher: Cipher,
+    key: SecretKey,
+    plain: ByteArray,
+    plainOff: Int,
+    plainLen: Int,
+    iv: ByteArray,
+    out: ByteArray
+): Int {
+    cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+    val ctLen = cipher.doFinal(plain, plainOff, plainLen, out, 16)
+    val combinedLen = 12 + ctLen
+    out[0] = (combinedLen ushr 24).toByte()
+    out[1] = (combinedLen ushr 16).toByte()
+    out[2] = (combinedLen ushr 8).toByte()
+    out[3] = combinedLen.toByte()
+    System.arraycopy(iv, 0, out, 4, 12)
+    return 16 + ctLen
+}
+
+internal fun decodeFrame(
+    cipher: Cipher,
+    key: SecretKey,
+    frame: ByteArray,
+    frameOff: Int,
+    frameLen: Int,
+    plainOut: ByteArray
+): Int {
+    cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, frame, frameOff, 12))
+    return cipher.doFinal(frame, frameOff + 12, frameLen - 12, plainOut, 0)
 }

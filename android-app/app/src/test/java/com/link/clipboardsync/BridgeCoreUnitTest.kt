@@ -418,4 +418,70 @@ class BridgeCoreUnitTest {
         assertNull(NotificationActionRequest.fromJson(JSONObject("""{"id":"","actionId":0}""")))
         assertNull(NotificationDismissRequest.fromJson(JSONObject("""{"id":""}""")))
     }
+
+    @Test
+    fun frameCodec_roundTripsBothDirections() {
+        val keyBytes = ByteArray(32) { (it * 7 + 3).toByte() }
+        val key = SecretKeySpec(keyBytes, "AES")
+        val plain = ByteArray(64 * 1024) { (it % 251).toByte() }
+        val iv = ByteArray(12) { (it * 5 + 1).toByte() }
+
+        // New encoder -> standard Cipher decrypt, checking wire layout:
+        // [4-byte BE combined len][12-byte IV][AES-GCM ct + 16-byte tag].
+        val frame = ByteArray(4 + 12 + plain.size + 16)
+        val encCipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val used = encodeFrame(encCipher, key, plain, 0, plain.size, iv, frame)
+        assertEquals(16 + plain.size + 16, used)
+
+        val combinedLen = ((frame[0].toInt() and 0xFF) shl 24) or
+            ((frame[1].toInt() and 0xFF) shl 16) or
+            ((frame[2].toInt() and 0xFF) shl 8) or (frame[3].toInt() and 0xFF)
+        assertEquals(12 + plain.size + 16, combinedLen)
+        assertArrayEquals(iv, frame.copyOfRange(4, 16))
+
+        val stdCipher = Cipher.getInstance("AES/GCM/NoPadding")
+        stdCipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
+        val decrypted = stdCipher.doFinal(frame, 16, used - 16)
+        assertArrayEquals(plain, decrypted)
+
+        // Standard encrypt -> new decoder.
+        val stdEnc = Cipher.getInstance("AES/GCM/NoPadding")
+        stdEnc.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+        val ctWithTag = stdEnc.doFinal(plain)
+        val wire = ByteArray(12 + ctWithTag.size)
+        System.arraycopy(iv, 0, wire, 0, 12)
+        System.arraycopy(ctWithTag, 0, wire, 12, ctWithTag.size)
+        val out = ByteArray(plain.size + 64)
+        val decCipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val n = decodeFrame(decCipher, key, wire, 0, wire.size, out)
+        assertEquals(plain.size, n)
+        assertArrayEquals(plain, out.copyOfRange(0, n))
+    }
+
+    @Test
+    fun bleLinkTuner_policyHysteresis() {
+        val low = BleLinkTuner.Priority.LOW_POWER
+        val high = BleLinkTuner.Priority.HIGH
+        // Engage HIGH at >=8KB in a 1s window.
+        assertEquals(high, BleLinkTuner.desiredPriority(low, 8192, 0))
+        assertEquals(high, BleLinkTuner.desiredPriority(low, 65536, 99))
+        assertEquals(low, BleLinkTuner.desiredPriority(low, 8191, 0))
+        assertEquals(low, BleLinkTuner.desiredPriority(low, 0, 3))
+        // Stay HIGH while busy; drop to LOW_POWER only after 5 quiet windows.
+        assertEquals(high, BleLinkTuner.desiredPriority(high, 8192, 0))
+        assertEquals(high, BleLinkTuner.desiredPriority(high, 100, 4))
+        assertEquals(low, BleLinkTuner.desiredPriority(high, 100, 5))
+        assertEquals(low, BleLinkTuner.desiredPriority(high, 0, 6))
+    }
+
+    @Test
+    fun appIconDedup_marksOnceUntilCleared() {
+        AppIconDedup.clear()
+        assertTrue(AppIconDedup.mark("com.example.a"))
+        assertFalse(AppIconDedup.mark("com.example.a"))
+        assertTrue(AppIconDedup.mark("com.example.b"))
+        // Cleared on (re)connect/disconnect so a new connection resends icons.
+        AppIconDedup.clear()
+        assertTrue(AppIconDedup.mark("com.example.a"))
+    }
 }

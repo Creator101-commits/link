@@ -105,6 +105,8 @@ class BridgeModel: ObservableObject {
     }
     
     private func setupServerCallbacks() {
+        // Assigned once: the observer reads current connection state lazily.
+        AXNotificationObserver.shared.shouldScan = { [weak self] in self?.isConnected == true }
         server.onStatusChanged = { [weak self] connected, device in
             DispatchQueue.main.async {
                 guard let self = self else { return }

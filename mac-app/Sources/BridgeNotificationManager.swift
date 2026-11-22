@@ -188,6 +188,12 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
                 self.handleIncomingSettingsSync(json: json)
 
             case "notif_post":
+                // Seed the app-icon cache before any enable/filter checks so a
+                // filtered notification still caches the phone app's icon.
+                if let pkg = json["pkg"] as? String,
+                   let icon = json["icon"] as? String {
+                    BridgeAppIconCache.shared.store(pkg: pkg, base64: icon)
+                }
                 guard self.isEffectiveAndroidReceiveEnabled else {
                     NSLog("[BridgeNotif] Ignoring incoming phone notification (Android notifications disabled)")
                     return
@@ -281,7 +287,9 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
             app: rawNotif.app.map { String($0.prefix(128)) },
             title: rawNotif.title.map { String($0.prefix(256)) },
             text: rawNotif.text.map { String($0.prefix(4000)) },
-            icon: safeIcon,
+            // Android icons resolve via BridgeAppIconCache by pkg; keeping the
+            // base64 out of the stored model saves memory on every render.
+            icon: (rawNotif.source ?? "android") == "android" ? nil : safeIcon,
             timestamp: rawNotif.timestamp,
             actions: safeActions,
             isSilent: rawNotif.isSilent,
@@ -407,6 +415,20 @@ public class BridgeNotificationManager: NSObject, ObservableObject, UNUserNotifi
         content.sound = isSoundEnabled ? .default : nil
         content.threadIdentifier = extractBaseId(notif.id)
         content.userInfo = ["notif_id": notif.id]
+
+        // Show the phone app's own icon as a notification attachment
+        // thumbnail (the banner's leading icon stays Bridge's — replacing it
+        // needs a restricted entitlement we don't have).
+        if let pkg = notif.pkg, !pkg.isEmpty,
+           let iconURL = BridgeAppIconCache.shared.attachmentURL(pkg: pkg) {
+            do {
+                content.attachments = [try UNNotificationAttachment(
+                    identifier: "appicon", url: iconURL, options: nil
+                )]
+            } catch {
+                try? FileManager.default.removeItem(at: iconURL)
+            }
+        }
 
         var unActions: [UNNotificationAction] = []
         if let actions = notif.actions {

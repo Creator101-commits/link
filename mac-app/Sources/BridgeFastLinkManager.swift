@@ -196,13 +196,16 @@ final class BridgeFastLinkManager: ObservableObject {
             var emptyScans = 0
             var triedNetworkSetup = false
             while Date() < joinDeadline && !joined {
-                if let network = (try? iface.scanForNetworks(withName: offer.ssid))?.first {
+                // Prefer cached scan results before paying for an active scan.
+                let cachedHit = iface.cachedScanResults()?.first { $0.ssid == offer.ssid }
+                let network = cachedHit ?? (try? iface.scanForNetworks(withName: offer.ssid))?.first
+                if let network = network {
                     emptyScans = 0
                     do {
                         try iface.associate(to: network, password: offer.psk)
                         joined = true
                     } catch {
-                        usleep(400_000)
+                        usleep(200_000)
                     }
                 } else {
                     emptyScans += 1
@@ -214,7 +217,7 @@ final class BridgeFastLinkManager: ObservableObject {
                             psk: offer.psk
                         )
                     }
-                    usleep(600_000)
+                    usleep(250_000)
                 }
             }
             guard joined else {
@@ -231,7 +234,7 @@ final class BridgeFastLinkManager: ObservableObject {
                 ip = found
                 break
             }
-            usleep(300_000)
+            usleep(50_000)
         }
         guard let ip = ip else {
             failJoin(deviceId: deviceId, reason: "no_ip")
@@ -282,8 +285,9 @@ final class BridgeFastLinkManager: ObservableObject {
             var rejoined = false
             for _ in 0..<3 {
                 guard let iface = iface else { break }
-                if let networks = try? iface.scanForNetworks(withName: ssid),
-                   let network = networks.first {
+                let network = iface.cachedScanResults()?.first { $0.ssid == ssid }
+                    ?? (try? iface.scanForNetworks(withName: ssid))?.first
+                if let network = network {
                     do {
                         try iface.associate(to: network, password: nil)
                         rejoined = true

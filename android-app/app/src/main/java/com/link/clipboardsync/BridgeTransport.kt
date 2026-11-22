@@ -34,7 +34,11 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -147,7 +151,7 @@ object BridgeTransport {
                 throw IOException("Could not find the Bridge Mac over Bluetooth")
             }
             try {
-                return openRelaySocket(endpoint, port, timeoutMs)
+                return openRelaySocket(appCtx, endpoint, port, timeoutMs)
             } catch (e: Exception) {
                 lastError = e
                 Log.w(TAG, "Bluetooth relay attempt ${attempt + 1} failed: ${e.message}")
@@ -161,7 +165,7 @@ object BridgeTransport {
      * Opens the L2CAP CoC channel to the Mac, writes the relay header for
      * [port], and returns a loopback [Socket] bridged to the channel.
      */
-    private fun openRelaySocket(endpoint: MacEndpoint, port: Int, timeoutMs: Int): Socket {
+    private fun openRelaySocket(ctx: Context, endpoint: MacEndpoint, port: Int, timeoutMs: Int): Socket {
         val btSocket = try {
             openL2capWithTimeout(endpoint.device, endpoint.psm, timeoutMs)
         } catch (e: Exception) {
@@ -172,7 +176,7 @@ object BridgeTransport {
                 write(buildRelayHeader(port))
                 flush()
             }
-            return bridgeToLoopback(btSocket)
+            return bridgeToLoopback(ctx, btSocket)
         } catch (e: Exception) {
             try { btSocket.close() } catch (_: Exception) {}
             throw e
@@ -207,7 +211,7 @@ object BridgeTransport {
      * client side. Two daemon pump threads shuttle bytes in both directions;
      * whichever direction ends first closes both sockets.
      */
-    private fun bridgeToLoopback(btSocket: BluetoothSocket): Socket {
+    private fun bridgeToLoopback(ctx: Context, btSocket: BluetoothSocket): Socket {
         val loopback = InetAddress.getLoopbackAddress()
         val server = ServerSocket(0, 1, loopback)
         val client = Socket()
@@ -218,10 +222,18 @@ object BridgeTransport {
 
             // BluetoothSocket is not a java.net.Socket, so pumps work on the
             // raw streams and teardown closes both channel ends directly.
+            // Both pump threads call onEnd, so teardown must run exactly once.
+            val tornDown = AtomicBoolean(false)
             val teardown = {
-                try { accepted.close() } catch (_: Exception) {}
-                try { btSocket.close() } catch (_: Exception) {}
+                if (tornDown.compareAndSet(false, true)) {
+                    try { accepted.close() } catch (_: Exception) {}
+                    try { btSocket.close() } catch (_: Exception) {}
+                    BleLinkTuner.relaySocketClosed()
+                }
             }
+            // Count the socket before starting pumps: a fast teardown must
+            // never decrement before this increment (would leak the GATT client).
+            BleLinkTuner.relaySocketOpened(ctx, btSocket.remoteDevice)
             startPump(accepted.getInputStream(), btSocket.getOutputStream(), teardown)
             startPump(btSocket.getInputStream(), accepted.getOutputStream(), teardown)
             return client
@@ -265,6 +277,7 @@ object BridgeTransport {
                     if (read < 0) break
                     dst.write(buffer, 0, read)
                     dst.flush()
+                    BleLinkTuner.noteBytes(read)
                 }
             } catch (_: Exception) {
                 // Either direction ending tears down both sockets below.
@@ -485,5 +498,170 @@ object BridgeTransport {
     fun isValidBluetoothId(s: String?): Boolean {
         if (s == null || s.length != 8) return false
         return s.all { it in '0'..'9' || it in 'a'..'f' }
+    }
+}
+
+/**
+ * Adaptive BLE link tuning for L2CAP relay sockets. Keeps one long-lived
+ * GATT client per Mac endpoint so PHY and connection-priority can be
+ * adjusted while bytes flow, and releases it once no relay sockets remain.
+ * Pump threads only bump an atomic byte counter; every GATT call runs on a
+ * single scheduler thread.
+ */
+internal object BleLinkTuner {
+
+    enum class Priority { HIGH, LOW_POWER }
+
+    /**
+     * Pure hysteresis policy (unit-tested): engage HIGH priority when at
+     * least 8 KB moved in the current 1 s window, and drop back to
+     * LOW_POWER after 5 consecutive windows under that rate.
+     */
+    fun desiredPriority(current: Priority, bytesInWindow: Int, consecutiveLowWindows: Int): Priority {
+        return when {
+            current == Priority.LOW_POWER && bytesInWindow >= 8192 -> Priority.HIGH
+            current == Priority.HIGH && consecutiveLowWindows >= 5 -> Priority.LOW_POWER
+            else -> current
+        }
+    }
+
+    private const val HIGH_WATERMARK_BYTES = 8192
+    private const val QUIET_WINDOWS_TO_IDLE = 5
+
+    private val scheduler = Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "ble-link-tuner").apply { isDaemon = true }
+    }
+    private val openSockets = AtomicInteger(0)
+    private val windowBytes = AtomicLong(0)
+    private val tickRunning = AtomicBoolean(false)
+
+    // All of the fields below are confined to the scheduler thread.
+    private var priority = Priority.LOW_POWER
+    private var consecutiveLowWindows = 0
+    private var gatt: BluetoothGatt? = null
+    private var gattAddress: String? = null
+    private var tickFuture: ScheduledFuture<*>? = null
+
+    private val gattCallback = object : BluetoothGattCallback() {
+        override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+            when (newState) {
+                BluetoothProfile.STATE_CONNECTED -> scheduler.execute {
+                    if (gatt === g) {
+                        try {
+                            g.setPreferredPhy(
+                                BluetoothDevice.PHY_LE_2M_MASK,
+                                BluetoothDevice.PHY_LE_2M_MASK,
+                                BluetoothDevice.PHY_OPTION_NO_PREFERRED
+                            )
+                        } catch (_: Throwable) {
+                        }
+                        applyPriority(g)
+                    }
+                }
+                BluetoothProfile.STATE_DISCONNECTED -> scheduler.execute {
+                    if (gatt === g) {
+                        gatt = null
+                        gattAddress = null
+                        try { g.close() } catch (_: Throwable) {}
+                    }
+                }
+            }
+        }
+    }
+
+    /** Called once per successfully bridged relay socket (any thread). */
+    fun relaySocketOpened(ctx: Context, device: BluetoothDevice) {
+        openSockets.incrementAndGet()
+        val appCtx = ctx.applicationContext
+        scheduler.execute {
+            ensureGatt(appCtx, device)
+        }
+    }
+
+    /** Called from relay teardown; the GATT client closes at zero sockets. */
+    fun relaySocketClosed() {
+        if (openSockets.decrementAndGet() <= 0) {
+            scheduler.execute {
+                closeGatt()
+                stopTick()
+            }
+        }
+    }
+
+    /** Cheap pump hot-path hook: atomic add + one CAS, no locks. */
+    fun noteBytes(count: Int) {
+        if (count <= 0) return
+        windowBytes.addAndGet(count.toLong())
+        // Event-driven: only the first byte after idle schedules the tick loop.
+        if (tickRunning.compareAndSet(false, true)) {
+            scheduler.execute { startTick() }
+        }
+    }
+
+    // MARK: - Scheduler-thread internals
+
+    private fun startTick() {
+        if (tickFuture != null) {
+            tickRunning.set(false)
+            return
+        }
+        tickFuture = scheduler.scheduleAtFixedRate({ tick() }, 1, 1, TimeUnit.SECONDS)
+    }
+
+    private fun stopTick() {
+        tickFuture?.cancel(false)
+        tickFuture = null
+        tickRunning.set(false)
+    }
+
+    private fun tick() {
+        val bytes = windowBytes.getAndSet(0).toInt()
+        consecutiveLowWindows = if (bytes >= HIGH_WATERMARK_BYTES) 0 else consecutiveLowWindows + 1
+        val desired = desiredPriority(priority, bytes, consecutiveLowWindows)
+        if (desired != priority) {
+            priority = desired
+            gatt?.let { applyPriority(it) }
+        }
+        // Idle: nothing moved and we're already in the power-saving state —
+        // stop waking up until the next byte arrives.
+        if (priority == Priority.LOW_POWER && bytes == 0) {
+            stopTick()
+        }
+    }
+
+    private fun ensureGatt(ctx: Context, device: BluetoothDevice) {
+        val address = device.address ?: return
+        if (gatt != null && gattAddress == address) return
+        closeGatt()
+        if (!hasConnectPermission(ctx)) return
+        gattAddress = address
+        gatt = try {
+            device.connectGatt(ctx, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        } catch (t: Throwable) {
+            gattAddress = null
+            null
+        }
+    }
+
+    private fun closeGatt() {
+        gatt?.let { try { it.close() } catch (_: Throwable) {} }
+        gatt = null
+        gattAddress = null
+    }
+
+    private fun applyPriority(g: BluetoothGatt) {
+        try {
+            g.requestConnectionPriority(
+                if (priority == Priority.HIGH) BluetoothGatt.CONNECTION_PRIORITY_HIGH
+                else BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER
+            )
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun hasConnectPermission(ctx: Context): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.BLUETOOTH_CONNECT) ==
+                PackageManager.PERMISSION_GRANTED
     }
 }

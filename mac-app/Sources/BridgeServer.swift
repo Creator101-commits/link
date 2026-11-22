@@ -845,7 +845,23 @@ class BridgeServer {
     private static let maxUnauthConnections = 4
     private static let unauthHandshakeTimeoutSeconds: TimeInterval = 8.0
     private static let bluetoothUnauthHandshakeTimeoutSeconds: TimeInterval = 20.0
-    private static let bluetoothStaleConnectionSeconds: TimeInterval = 20.0
+    private static let bluetoothStaleConnectionSeconds: TimeInterval = 30.0
+    private static let lanStaleConnectionSeconds: TimeInterval = 20.0
+    /// Peer is considered silent (worth a ping) after this many seconds.
+    private static let heartbeatPingSilentSeconds: TimeInterval = 9.0
+
+    enum HeartbeatAction {
+        case none, ping, stale
+    }
+
+    /// Pure decision for one authenticated connection per heartbeat tick.
+    static func heartbeatAction(now: TimeInterval, lastSeen: TimeInterval, isBluetooth: Bool) -> HeartbeatAction {
+        let staleAfter = isBluetooth ? bluetoothStaleConnectionSeconds : lanStaleConnectionSeconds
+        let silentFor = now - lastSeen
+        if silentFor > staleAfter { return .stale }
+        if silentFor > heartbeatPingSilentSeconds { return .ping }
+        return .none
+    }
     private static let supportedImageExtensions: Set<String> = [
         "png", "jpg", "jpeg", "webp", "heic", "tiff", "tif", "bmp", "gif"
     ]
@@ -1534,9 +1550,11 @@ class BridgeServer {
     
     private func startClipboardPolling() {
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
             self?.checkPasteboard()
         }
+        timer.tolerance = 0.1
+        pollTimer = timer
     }
     
     private func checkPasteboard() {
@@ -1670,9 +1688,11 @@ class BridgeServer {
     
     private func startHeartbeat() {
         heartbeatTimer?.invalidate()
-        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.checkConnectionsAndSendPing()
         }
+        timer.tolerance = 1.0
+        heartbeatTimer = timer
     }
     
     private func checkConnectionsAndSendPing() {
@@ -1694,21 +1714,27 @@ class BridgeServer {
                 }
             }
 
-            // 2. Heartbeat authenticated connections
+            // 2. Heartbeat authenticated connections: ping only silent peers,
+            //    drop ones that have been silent past the stale threshold.
             for id in self.authenticatedConnections {
-                let lastSeen = self.connectionLastSeen[id] ?? 0
-                let isBluetooth = self.connections[id].map { self.isBluetoothRelayConnection($0) } ?? false
-                if now - lastSeen > (isBluetooth ? Self.bluetoothStaleConnectionSeconds : 6.5) {
+                guard let conn = self.connections[id] else {
                     staleIds.append(id)
-                } else if let conn = self.connections[id] {
+                    continue
+                }
+                let lastSeen = self.connectionLastSeen[id] ?? 0
+                let isBluetooth = self.isBluetoothRelayConnection(conn)
+                switch Self.heartbeatAction(now: now, lastSeen: lastSeen, isBluetooth: isBluetooth) {
+                case .stale:
+                    staleIds.append(id)
+                case .ping:
                     self.sendEncryptedData(data, to: conn, id: id) { [weak self, weak conn] error in
                         if error != nil {
                             conn?.cancel()
                             self?.removeConnection(id: id)
                         }
                     }
-                } else {
-                    staleIds.append(id)
+                case .none:
+                    break
                 }
             }
             

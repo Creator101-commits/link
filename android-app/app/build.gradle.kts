@@ -66,6 +66,14 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+        // Installable R8-minified, non-debuggable build (debug builds run much
+        // slower/heavier). Same minify/shrink settings as release, debug signing.
+        create("optimized") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

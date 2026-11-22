@@ -1,7 +1,91 @@
 import Foundation
 import AppKit
+import CryptoKit
 
 // MARK: - Notification Data Models
+
+/// Disk+memory cache for remote app icons keyed by package name.
+/// `pkg` is untrusted input: it is NEVER used in a file path — on-disk
+/// filenames are the SHA-256 hex digest of the pkg string.
+public final class BridgeAppIconCache {
+    public static let shared = BridgeAppIconCache()
+
+    private let memoryCache = NSCache<NSString, NSImage>()
+    private let directoryURL: URL
+    /// Pkgs known to have no icon on disk, so image(pkg:) doesn't hit disk
+    /// on every render. Guarded by missingLock.
+    private let missingLock = NSLock()
+    private var missingPkgs = Set<String>()
+
+    private init() {
+        let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        directoryURL = cachesDir.appendingPathComponent("com.link.bridge/app-icons", isDirectory: true)
+        memoryCache.countLimit = 64
+    }
+
+    /// On-disk filename for a pkg's cached icon: SHA-256 hex of the pkg +
+    /// ".png". The pkg string itself is never used in a path.
+    static func cacheFileName(forPkg pkg: String) -> String {
+        let digest = SHA256.hash(data: Data(pkg.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined() + ".png"
+    }
+
+    private func fileURL(forPkg pkg: String) -> URL {
+        directoryURL.appendingPathComponent(Self.cacheFileName(forPkg: pkg))
+    }
+
+    /// Stores a base64-encoded PNG icon. Rejects oversized or undecodable data.
+    public func store(pkg: String, base64: String) {
+        guard !pkg.isEmpty, pkg.count <= 128,
+              let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters),
+              data.count <= 512 * 1024,
+              let image = NSImage(data: data) else { return }
+        memoryCache.setObject(image, forKey: pkg as NSString)
+        missingLock.lock()
+        missingPkgs.remove(pkg)
+        missingLock.unlock()
+        let url = fileURL(forPkg: pkg)
+        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try? data.write(to: url, options: .atomic)
+    }
+
+    public func image(pkg: String) -> NSImage? {
+        if let cached = memoryCache.object(forKey: pkg as NSString) {
+            return cached
+        }
+        missingLock.lock()
+        let knownMissing = missingPkgs.contains(pkg)
+        missingLock.unlock()
+        if knownMissing { return nil }
+        let url = fileURL(forPkg: pkg)
+        guard let data = try? Data(contentsOf: url),
+              let image = NSImage(data: data) else {
+            missingLock.lock()
+            missingPkgs.insert(pkg)
+            missingLock.unlock()
+            return nil
+        }
+        memoryCache.setObject(image, forKey: pkg as NSString)
+        return image
+    }
+
+    /// Returns a unique temp copy of the cached icon for use as a
+    /// UNNotificationAttachment — the system moves the file, so the cache
+    /// file itself must never be handed over.
+    public func attachmentURL(pkg: String) -> URL? {
+        let source = fileURL(forPkg: pkg)
+        guard FileManager.default.fileExists(atPath: source.path) else { return nil }
+        let dest = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("bridge-icon-\(UUID().uuidString).png")
+        do {
+            try FileManager.default.copyItem(at: source, to: dest)
+            return dest
+        } catch {
+            return nil
+        }
+    }
+}
 
 public struct BridgeNotificationAction: Codable, Identifiable {
     public let id: Int
@@ -73,6 +157,12 @@ public struct BridgeNotification: Codable, Identifiable {
     }
 
     public var iconImage: NSImage? {
+        // Android-sourced icons live in BridgeAppIconCache keyed by pkg;
+        // fall back to the inline base64 (mac-source notifications).
+        if let pkg = pkg, !pkg.isEmpty,
+           let cached = BridgeAppIconCache.shared.image(pkg: pkg) {
+            return cached
+        }
         guard let base64 = icon,
               let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters) else {
             return nil

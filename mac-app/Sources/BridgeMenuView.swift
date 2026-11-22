@@ -701,38 +701,31 @@ struct FileTransferCardView: View {
 
 // MARK: - Isolated Status Dot View
 
-final class StatusDotTicker: ObservableObject {
-    static let shared = StatusDotTicker()
-    @Published var breathe: Bool = false
-    private var timer: Timer?
-
-    private init() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { [weak self] _ in
-            self?.breathe.toggle()
-        }
-    }
-
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-        breathe = false
-    }
-}
-
 struct StatusDotView: View {
     let isConnected: Bool
-    @ObservedObject private var ticker = StatusDotTicker.shared
+    @State private var breathe = false
 
     var body: some View {
         Circle()
             .fill(isConnected ? BridgeColors.lime : BridgeColors.muted)
             .frame(width: 7, height: 7)
-            .scaleEffect(ticker.breathe && isConnected ? 0.8 : 1.0)
-            .opacity(ticker.breathe && isConnected ? 0.35 : 1.0)
-            .animation(
-                isConnected ? Animation.easeInOut(duration: 1.2) : .default,
-                value: ticker.breathe
-            )
+            .scaleEffect(breathe && isConnected ? 0.8 : 1.0)
+            .opacity(breathe && isConnected ? 0.35 : 1.0)
+            .onAppear {
+                guard isConnected else { return }
+                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                    breathe = true
+                }
+            }
+            .onChange(of: isConnected) { connected in
+                if connected {
+                    withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                        breathe = true
+                    }
+                } else {
+                    withAnimation(.default) { breathe = false }
+                }
+            }
     }
 }
 

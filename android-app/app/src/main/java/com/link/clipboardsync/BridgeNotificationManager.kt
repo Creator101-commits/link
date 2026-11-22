@@ -19,6 +19,11 @@ import org.json.JSONObject
 import java.util.concurrent.CopyOnWriteArraySet
 
 object BridgeNotificationManager {
+    /** Marks [pkg] as icon-sent; returns true only the first time per connection. */
+    fun markAppIconSent(pkg: String): Boolean = AppIconDedup.mark(pkg)
+
+    fun clearSentAppIcons() = AppIconDedup.clear()
+
 
     private const val TAG = "BridgeNotifManager"
     const val CHANNEL_MAC_ALERTS = "bridge_mac_alerts"
@@ -116,7 +121,16 @@ object BridgeNotificationManager {
         }
         val client = ClipboardSyncManager.networkClient
         if (client != null) {
-            client.sendRawJson(notif.toPostJsonString())
+            // De-dup app icons per connection: the first notification for a
+            // pkg keeps its icon; later ones strip it. When the client is not
+            // connected the icon is kept (the send may be queued/retried).
+            val toSend = if (notif.icon != null && notif.pkg.isNotEmpty() &&
+                client.isConnected() && !AppIconDedup.mark(notif.pkg)) {
+                notif.copy(icon = null)
+            } else {
+                notif
+            }
+            client.sendRawJson(toSend.toPostJsonString())
             Log.d(TAG, "Forwarded notification to Mac: [${notif.app}] ${notif.title}")
         }
     }
@@ -149,16 +163,30 @@ object BridgeNotificationManager {
         }
     }
 
+    // Dedup: identical id lists are re-sent at most every 5 minutes; the memo
+    // resets on (re)connect so a fresh connection always sends a snapshot.
+    private var lastSyncedIdsKey: String? = null
+    private var lastSyncedIdsAtMs = 0L
+
+    fun resetActiveIdsSyncMemo() {
+        lastSyncedIdsKey = null
+    }
+
     fun syncActiveIdsToMac(activeIds: List<String>) {
         val client = ClipboardSyncManager.networkClient
         if (client != null) {
+            val key = activeIds.sorted().joinToString(",")
+            val now = System.currentTimeMillis()
+            if (key == lastSyncedIdsKey && now - lastSyncedIdsAtMs < 300_000) return
             val json = JSONObject()
             json.put("type", "notif_sync")
             val arr = JSONArray()
             activeIds.forEach { arr.put(it) }
             json.put("activeIds", arr)
-            json.put("timestamp", System.currentTimeMillis())
+            json.put("timestamp", now)
             client.sendRawJson(json.toString())
+            lastSyncedIdsKey = key
+            lastSyncedIdsAtMs = now
             Log.d(TAG, "Sent active notifications snapshot to Mac: count=${activeIds.size}")
         }
     }
@@ -370,4 +398,18 @@ object BridgeNotificationManager {
             Log.w(TAG, "POST_NOTIFICATIONS permission not granted: ${e.message}")
         }
     }
+}
+
+/**
+ * Per-connection app-icon de-dup: each pkg's icon is sent to the Mac once per
+ * connection; the set is cleared on connect/disconnect. Pure JVM (no Android
+ * dependencies) so it stays unit-testable.
+ */
+internal object AppIconDedup {
+    private val sent = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /** Marks [pkg] as sent; returns true only the first time. */
+    fun mark(pkg: String): Boolean = synchronized(sent) { sent.add(pkg) }
+
+    fun clear() = synchronized(sent) { sent.clear() }
 }

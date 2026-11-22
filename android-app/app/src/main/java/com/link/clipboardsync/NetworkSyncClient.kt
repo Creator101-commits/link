@@ -505,19 +505,21 @@ class NetworkSyncClient(private val context: Context) {
     private fun startHeartbeat() {
         stopHeartbeat()
         heartbeatTick = 0
+        // 8s heartbeat: infrequent enough to save battery, frequent enough to
+        // keep NAT/router state alive and detect a dead peer quickly.
         heartbeatTask = heartbeatExecutor.scheduleWithFixedDelay({
             if (isRunning.get() && isConnected()) {
                 try {
                     writeEncrypted(ClipboardPayload(type = "ping"))
                     heartbeatTick++
-                    if (heartbeatTick % 3 == 0) {
+                    // ~64s (8 x 8s ticks)
+                    if (heartbeatTick % 8 == 0) {
                         BridgeNotificationListenerService.instance?.syncActiveIdsOnly()
                     }
-                    // ~60s (20 x 3s ticks): NSD reports a service only once and
-                    // discovery usually stops after resolve, so while on
-                    // Bluetooth restart it to give the LAN upgrade probe
-                    // another chance.
-                    if (heartbeatTick % 20 == 0 &&
+                    // ~64s: NSD reports a service only once and discovery
+                    // usually stops after resolve, so while on Bluetooth
+                    // restart it to give the LAN upgrade probe another chance.
+                    if (heartbeatTick % 8 == 0 &&
                         isConnectedViaBluetooth() &&
                         hasWifiOrEthernetTransport() &&
                         !BridgeFastLink.isActive() &&
@@ -531,7 +533,7 @@ class NetworkSyncClient(private val context: Context) {
                     notifyConnectionStatusChanged(false, currentHost)
                 }
             }
-        }, 3, 3, TimeUnit.SECONDS)
+        }, 8, 8, TimeUnit.SECONDS)
     }
 
     private fun stopHeartbeat() {
@@ -607,8 +609,8 @@ class NetworkSyncClient(private val context: Context) {
                     )
                     s.tcpNoDelay = true
                     s.keepAlive = true
-                    // BLE latency is higher; the 3s heartbeat stays well within this.
-                    s.soTimeout = if (isBluetoothAttempt) 20000 else 7500
+                    // BLE latency is higher; the 8s heartbeat stays well within this.
+                    s.soTimeout = if (isBluetoothAttempt) 30000 else 20000
 
                     val out = PrintWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8), true)
                     val reader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
@@ -701,6 +703,8 @@ class NetworkSyncClient(private val context: Context) {
                                         BridgePrefs.markPaired(context, macName)
                                         log("Paired with ${payload.name} at $host:$currentPort (SPEKE + AES-256-GCM)")
                                         notifyPairingResult(true, macName)
+                                        BridgeNotificationManager.resetActiveIdsSyncMemo()
+                                        BridgeNotificationManager.clearSentAppIcons()
                                         notifyConnectionStatusChanged(true, host)
                                         startHeartbeat()
                                         BridgeNotificationListenerService.instance?.syncActiveNotifications()
@@ -823,6 +827,7 @@ class NetworkSyncClient(private val context: Context) {
     }
 
     private fun notifyConnectionStatusChanged(isConnected: Boolean, host: String?) {
+        if (!isConnected) BridgeNotificationManager.clearSentAppIcons()
         for (l in listeners) {
             try { l.onConnectionStatusChanged(isConnected, host) } catch (ignored: Exception) {}
         }

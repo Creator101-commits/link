@@ -50,7 +50,6 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
     }
 
     private lateinit var clipboardManager: ClipboardManager
-    private var wifiLock: WifiManager.WifiLock? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -62,17 +61,8 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
 
         startForegroundWithNotification(initialStatus())
 
-        // High-performance Wi-Fi lock so the radio doesn't drop the idle socket
-        try {
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            @Suppress("DEPRECATION")
-            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Bridge::WifiLock").apply {
-                setReferenceCounted(false)
-                acquire()
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not acquire WifiLock: ${e.message}")
-        }
+        // Wi-Fi lock is held per-transfer by BridgeWifiLock (LAN/fast-link
+        // data paths only) instead of keeping the radio in high-perf mode.
 
         ClipboardSyncManager.init(this)
         ClipboardSyncManager.networkClient?.addListener(this)
@@ -244,7 +234,6 @@ class ClipboardSyncForegroundService : Service(), NetworkSyncClient.SyncListener
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
-        try { wifiLock?.release() } catch (ignored: Exception) {}
         ClipboardSyncManager.networkClient?.removeListener(this)
     }
 }

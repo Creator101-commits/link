@@ -555,7 +555,6 @@ private func runNotificationScrollLayoutTests() {
     let originalNotifications = notifManager.activeNotifications
     defer {
         notifManager.activeNotifications = originalNotifications
-        StatusDotTicker.shared.stop()
     }
 
     // 1. Single short notification stays compact without forcing full 280pt ScrollView height
@@ -602,6 +601,72 @@ private func runNotificationScrollLayoutTests() {
     expect(containsScrollView(longHost.view), "Single long notification exceeding 280pt must render inside NSScrollView")
 }
 
+private func runAdaptiveAndIconCacheTests() {
+    // heartbeatAction: stale thresholds differ per transport, ping when silent.
+    let now: TimeInterval = 1000
+    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 5, isBluetooth: false) == .none, "LAN conn seen 5s ago: no action")
+    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 5, isBluetooth: true) == .none, "BT conn seen 5s ago: no action")
+    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 10, isBluetooth: false) == .ping, "LAN conn silent 10s: ping")
+    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 25, isBluetooth: false) == .stale, "LAN conn silent 25s (>20): stale")
+    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 25, isBluetooth: true) == .ping, "BT conn silent 25s (<30): still ping, not stale")
+    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 35, isBluetooth: true) == .stale, "BT conn silent 35s (>30): stale")
+    expect(BridgeServer.heartbeatAction(now: now, lastSeen: now - 19, isBluetooth: false) == .ping, "LAN conn silent 19s: ping (under 20s stale)")
+
+    // BLE relay latency hysteresis: low at >=8KB/s, high after 5s quiet.
+    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .highLatency, bytesInWindow: 8192, msSinceLastByte: 0) == .lowLatency, "8KB window engages low latency")
+    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .highLatency, bytesInWindow: 4096, msSinceLastByte: 0) == .highLatency, "4KB window stays high latency")
+    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 0, msSinceLastByte: 6000) == .highLatency, "5s+ quiet releases to high latency")
+    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 0, msSinceLastByte: 4000) == .lowLatency, "4s quiet stays low latency")
+    expect(BridgeBluetoothRelay.desiredRelayLatency(current: .lowLatency, bytesInWindow: 9000, msSinceLastByte: 0) == .lowLatency, "active low-latency session stays low")
+
+    // Icon cache filename: SHA-256 hex (64 chars) + ".png"; pkg never in path.
+    let name = BridgeAppIconCache.cacheFileName(forPkg: "../../etc/passwd")
+    expect(name.hasSuffix(".png"), "Icon cache filename ends with .png")
+    expect(name.dropLast(4).count == 64, "Icon cache filename stem is 64 hex chars")
+    expect(name.dropLast(4).allSatisfy { $0.isHexDigit }, "Icon cache filename stem is hex only")
+    expect(!name.contains("passwd") && !name.contains("/"), "Pkg path traversal cannot reach filename")
+    expect(BridgeAppIconCache.cacheFileName(forPkg: "com.whatsapp") != name, "Distinct pkgs get distinct filenames")
+
+    // parseFrames: 2 complete frames + partial third inside a slice with a
+    // non-zero startIndex; each payload must open as AES.GCM combined.
+    let frameKey = SymmetricKey(size: .bits256)
+    func makeFrame(_ payload: String) -> Data {
+        let sealed = try! AES.GCM.seal(Data(payload.utf8), using: frameKey)
+        let combined = sealed.combined!
+        var frame = Data()
+        var len = UInt32(combined.count).bigEndian
+        frame.append(Data(bytes: &len, count: 4))
+        frame.append(combined)
+        return frame
+    }
+    let f1 = makeFrame("first-frame-payload")
+    let f2 = makeFrame("second!")
+    var blob = Data([0xAA, 0xBB, 0xCC])
+    blob.append(f1)
+    blob.append(f2)
+    blob.append(Data([0x00, 0x00, 0x10, 0x01])) // partial third frame
+    let slice = blob[3..<blob.count]
+    expect(slice.startIndex != 0, "Test slice must have non-zero startIndex")
+
+    let parsed = BridgeFileTransferManager.parseFrames(slice, maxFrameLen: 64 * 1024 + 2048)
+    expect(parsed.frames.count == 2, "parseFrames found \(parsed.frames.count) frames, expected 2")
+    expect(parsed.consumed == f1.count + f2.count, "parseFrames consumed \(parsed.consumed), expected \(f1.count + f2.count)")
+    expect(!parsed.corrupt, "parseFrames flagged corrupt on valid input")
+    for (idx, payload) in parsed.frames.enumerated() {
+        let box = try! AES.GCM.SealedBox(combined: payload)
+        let plain = try! AES.GCM.open(box, using: frameKey)
+        let expectedText = idx == 0 ? "first-frame-payload" : "second!"
+        expect(String(data: plain, encoding: .utf8) == expectedText, "Frame \(idx) decrypted to unexpected plaintext")
+    }
+
+    // Corrupt length prefix must be reported.
+    var bad = Data([0xFF, 0xFF, 0xFF, 0xFF])
+    bad.append(Data(repeating: 0, count: 64))
+    let badParsed = BridgeFileTransferManager.parseFrames(bad, maxFrameLen: 1024)
+    expect(badParsed.corrupt, "parseFrames must flag corrupt length prefix")
+    expect(badParsed.frames.isEmpty, "parseFrames returned frames before corrupt length")
+}
+
 @main
 struct BridgeTestRunner {
     static func main() {
@@ -612,6 +677,7 @@ struct BridgeTestRunner {
         runBluetoothRelayHeaderTests()
         runFastLinkManagerTests()
         runNotificationScrollLayoutTests()
+        runAdaptiveAndIconCacheTests()
         do {
             try runPayloadAndVersionTests()
             try runFileTransferSecurityTests()

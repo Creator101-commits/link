@@ -42,6 +42,102 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
     private var relayThread: RelayRunLoopThread?
     var relayRunLoop: RunLoop? { relayThread?.runLoop }
 
+    // Adaptive BLE link latency: fast while bytes flow, power-save when idle.
+    // Byte counts come from relay threads; the decision + CoreBluetooth calls
+    // happen on btQueue (the queue the peripheral manager uses).
+    enum BleLinkLatency: Equatable {
+        case highLatency, lowLatency
+    }
+
+    /// Pure hysteresis decision: engage low latency at >=8KB/s, release after
+    /// 5s of quiet. Only meaningful when it differs from `current`.
+    static func desiredRelayLatency(
+        current: BleLinkLatency,
+        bytesInWindow: Int,
+        msSinceLastByte: Int
+    ) -> BleLinkLatency {
+        if current == .highLatency && bytesInWindow >= 8192 { return .lowLatency }
+        if current == .lowLatency && msSinceLastByte >= 5000 { return .highLatency }
+        return current
+    }
+
+    private let latencyLock = NSLock()
+    private var bytesSinceLatencyTick = 0
+    private var lastRelayByteAt = Date.distantPast
+    private var relayLatencyState: BleLinkLatency = .highLatency
+    private var latencyTimer: DispatchSourceTimer?
+    /// True while the timer exists or a start is in flight (latencyLock).
+    private var latencyTimerActive = false
+
+    /// Called from relay threads; cheap counter bump + at most one btQueue kick.
+    func noteRelayBytes(_ count: Int) {
+        guard count > 0 else { return }
+        latencyLock.lock()
+        bytesSinceLatencyTick += count
+        lastRelayByteAt = Date()
+        let kick = !latencyTimerActive
+        if kick { latencyTimerActive = true }
+        latencyLock.unlock()
+        if kick {
+            btQueue.async { [weak self] in
+                self?.startLatencyTimer()
+            }
+        }
+    }
+
+    private func startLatencyTimer() {
+        let timer = DispatchSource.makeTimerSource(queue: btQueue)
+        timer.schedule(deadline: .now() + 1.0, repeating: 1.0, leeway: .milliseconds(200))
+        timer.setEventHandler { [weak self] in
+            self?.latencyTick()
+        }
+        timer.resume()
+        latencyTimer = timer
+    }
+
+    private func latencyTick() {
+        var bytes = 0
+        var lastAt = Date.distantPast
+        latencyLock.lock()
+        bytes = bytesSinceLatencyTick
+        lastAt = lastRelayByteAt
+        bytesSinceLatencyTick = 0
+        latencyLock.unlock()
+
+        let msSince = Int(Date().timeIntervalSince(lastAt) * 1000)
+        let desired = Self.desiredRelayLatency(
+            current: relayLatencyState,
+            bytesInWindow: bytes,
+            msSinceLastByte: msSince
+        )
+        if desired != relayLatencyState {
+            relayLatencyState = desired
+
+            let centrals = currentCentrals()
+            let cbLatency: CBPeripheralManagerConnectionLatency =
+                desired == .lowLatency ? .low : .high
+            for central in centrals {
+                peripheralManager?.setDesiredConnectionLatency(cbLatency, for: central)
+            }
+        }
+
+        // Event-driven idle: once power-saving and fully quiet, stop the
+        // timer until the next byte arrives (noteRelayBytes re-kicks it).
+        if relayLatencyState == .highLatency && bytes == 0 {
+            latencyTimer?.cancel()
+            latencyTimer = nil
+            latencyLock.lock()
+            latencyTimerActive = false
+            latencyLock.unlock()
+        }
+    }
+
+    private func currentCentrals() -> [CBCentral] {
+        sessionsLock.lock()
+        defer { sessionsLock.unlock() }
+        return sessions.compactMap { $0.peerCentral }
+    }
+
     private let sessionsLock = NSLock()
     private var sessions = [RelaySession]()
 
@@ -356,6 +452,9 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
             return storedLocalPort
         }
 
+        /// Central on the far end of this channel, for adaptive link latency.
+        var peerCentral: CBCentral? { channel.peer as? CBCentral }
+
         // MARK: Lifecycle
 
         func begin() {
@@ -431,7 +530,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
 
         private func readAvailableBytes() {
             guard let input = inputStream else { return }
-            var buffer = [UInt8](repeating: 0, count: 32 * 1024)
+            var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             while input.hasBytesAvailable && !closed {
                 let count = buffer.withUnsafeMutableBytes { raw -> Int in
                     guard let base = raw.baseAddress else { return 0 }
@@ -455,6 +554,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
                     close()
                 }
             case .piping:
+                owner?.noteRelayBytes(data.count)
                 forwardToTcp(data)
             }
         }
@@ -589,6 +689,7 @@ final class BridgeBluetoothRelay: NSObject, CBPeripheralManagerDelegate {
                         return output.write(base.assumingMemoryBound(to: UInt8.self), maxLength: raw.count)
                     }
                     guard written > 0 else { break }
+                    owner?.noteRelayBytes(written)
                     pendingOutbound.removeSubrange(0..<written)
                 }
             }
