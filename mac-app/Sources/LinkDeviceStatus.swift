@@ -22,9 +22,7 @@ final class LinkDeviceStatus: ObservableObject {
     @Published var status: Status?
     @Published var phoneName: String = "Phone"
 
-    private var alertedThisDischarge = false
-    private var lastLevel = 100
-    private var wasCharging = false
+    private var alertStage = 0
 
     private init() {}
 
@@ -45,44 +43,47 @@ final class LinkDeviceStatus: ObservableObject {
 
     func clear() {
         status = nil
-        alertedThisDischarge = false
-        lastLevel = 100
-        wasCharging = false
+        alertStage = 0
     }
 
     // MARK: - Low-battery alert
 
+    /// Final alert level, always used in addition to the configured threshold.
+    nonisolated static let criticalLevel = 10
+    nonisolated static let defaultThreshold = 20
+
     /// Pure decision function — unit-tested.
-    /// Returns the level to alert on (if any) and the new armed state.
-    /// state: 0 = armed (can alert), 1 = alerted this discharge cycle.
+    /// Alerts once at the configured threshold and once more at 10%.
+    /// state: 0 = armed, 1 = alerted at threshold, 2 = alerted at 10%.
     nonisolated static func lowBatteryDecision(
         level: Int, charging: Bool, threshold: Int, state: Int
     ) -> (alert: Int?, newState: Int) {
-        guard !charging else {
-            // Charging re-arms the alert for the next discharge.
-            return (nil, 0)
-        }
+        // Charging re-arms the alert for the next discharge.
+        if charging { return (nil, 0) }
         guard threshold > 0 else { return (nil, state) }
-        // Alert at the configured threshold; a higher threshold (20/30) still
-        // catches the 10% floor because 10 <= threshold.
-        guard level <= threshold else {
-            // Re-arm once the level climbs 5 above the configured threshold.
-            if state == 1 && level > threshold + 5 { return (nil, 0) }
-            return (nil, state)
+        if level <= criticalLevel {
+            return state < 2 ? (level, 2) : (nil, state)
         }
-        if state == 1 { return (nil, 1) } // already alerted this discharge
-        return (level, 1)
+        if level <= threshold {
+            return state < 1 ? (level, 1) : (nil, state)
+        }
+        // Re-arm once the level climbs 5 above the configured threshold.
+        if state > 0 && level > threshold + 5 { return (nil, 0) }
+        return (nil, state)
+    }
+
+    nonisolated static var configuredThreshold: Int {
+        UserDefaults.standard.object(forKey: "lowBatteryThreshold") == nil
+            ? defaultThreshold
+            : UserDefaults.standard.integer(forKey: "lowBatteryThreshold")
     }
 
     private func evaluateLowBattery(_ s: Status) {
-        let threshold = UserDefaults.standard.integer(forKey: "lowBatteryThreshold")
-        guard threshold > 0, let level = s.battery, let charging = s.charging else { return }
+        guard let level = s.battery, let charging = s.charging else { return }
         let (alertLevel, newState) = LinkDeviceStatus.lowBatteryDecision(
-            level: level, charging: charging, threshold: threshold, state: alertedThisDischarge ? 1 : 0
+            level: level, charging: charging, threshold: LinkDeviceStatus.configuredThreshold, state: alertStage
         )
-        alertedThisDischarge = (newState == 1)
-        wasCharging = charging
-        lastLevel = level
+        alertStage = newState
         guard let alert = alertLevel else { return }
         postLowBatteryNotification(level: alert)
     }

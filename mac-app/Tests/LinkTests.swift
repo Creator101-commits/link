@@ -704,6 +704,14 @@ private func runPhaseAFeatureTests() {
     expect(r.newState == 0, "level 5 above threshold re-arms")
     r = LinkDeviceStatus.lowBatteryDecision(level: 20, charging: false, threshold: 0, state: 0)
     expect(r.alert == nil, "threshold 0 (off) never alerts")
+    r = LinkDeviceStatus.lowBatteryDecision(level: 10, charging: false, threshold: 20, state: 1)
+    expect(r.alert == 10 && r.newState == 2, "second alert at 10% after the threshold alert")
+    r = LinkDeviceStatus.lowBatteryDecision(level: 8, charging: false, threshold: 20, state: 2)
+    expect(r.alert == nil && r.newState == 2, "no repeat after the 10% alert")
+    r = LinkDeviceStatus.lowBatteryDecision(level: 8, charging: false, threshold: 20, state: 0)
+    expect(r.alert == 8 && r.newState == 2, "connecting below 10% alerts once, not twice")
+    r = LinkDeviceStatus.lowBatteryDecision(level: 11, charging: false, threshold: 10, state: 0)
+    expect(r.alert == nil, "threshold 10 waits for 10%")
 
     // settings_sync appRules/skipSilent round-trip
     let rules = ["com.whatsapp": "high", "com.instagram": "muted"]

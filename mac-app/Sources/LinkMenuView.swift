@@ -1946,7 +1946,7 @@ struct LinkMenuView: View {
                 .font(.system(size: 13))
             Spacer()
             Picker("", selection: Binding(
-                get: { UserDefaults.standard.integer(forKey: "lowBatteryThreshold") },
+                get: { LinkDeviceStatus.configuredThreshold },
                 set: { UserDefaults.standard.set($0, forKey: "lowBatteryThreshold") }
             )) {
                 Text("Off").tag(0)
