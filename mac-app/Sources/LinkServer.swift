@@ -1317,6 +1317,7 @@ class LinkServer {
         }
 
         if type.hasPrefix("fastlink_") {
+            NSLog("[FastLink] routed type=%@ from=%@", type, id.uuidString)
             FastLinkManager.shared.handleControlMessage(jsonObject, fromDeviceId: id)
             return
         }
@@ -1344,6 +1345,8 @@ class LinkServer {
         }
 
         if type.hasPrefix("hotspot_") {
+            NSLog("[PhoneInternet] routed type=%@ state=%@", type,
+                  jsonObject["state"] as? String ?? "?")
             DispatchQueue.main.async { LinkPhoneInternet.shared.handleStatus(jsonObject) }
             return
         }

@@ -27,8 +27,16 @@ final class FastLinkManager: ObservableObject {
 
     private static let enabledKey = "bridgeFastLinkEnabled"
 
-    enum LinkState {
+    enum LinkState: CustomStringConvertible {
         case idle, joining, ready, restoring
+        var description: String {
+            switch self {
+            case .idle: return "idle"
+            case .joining: return "joining"
+            case .ready: return "ready"
+            case .restoring: return "restoring"
+            }
+        }
     }
 
     struct Offer {
@@ -41,6 +49,14 @@ final class FastLinkManager: ObservableObject {
         case rejoin(String)
         case powerCycle
         case disassociateOnly
+
+        var name: String {
+            switch self {
+            case .rejoin: return "rejoin"
+            case .powerCycle: return "powerCycle"
+            case .disassociateOnly: return "disassociateOnly"
+            }
+        }
     }
 
     // MARK: - Published state
@@ -62,7 +78,11 @@ final class FastLinkManager: ObservableObject {
     private lazy var locationManager = CLLocationManager()
 
     // Session state — fastLinkQueue only.
-    private var state: LinkState = .idle
+    private var state: LinkState = .idle {
+        didSet {
+            NSLog("[FastLink] state %@ -> %@", oldValue.description, state.description)
+        }
+    }
 
     /// True while a fast-link session is joining/ready/restoring (blocks other
     /// Wi-Fi switching like phone-internet).
@@ -169,6 +189,7 @@ final class FastLinkManager: ObservableObject {
     // MARK: - Offer handling (fastLinkQueue)
 
     private func handleOffer(_ offer: Offer, deviceId: UUID) {
+        NSLog("[FastLink] offer received ssid=%@", offer.ssid)
         guard isFastLinkEnabled else {
             replyFailed(deviceId: deviceId, session: offer.session, reason: "disabled")
             return
@@ -198,6 +219,8 @@ final class FastLinkManager: ObservableObject {
         joinedAt = nil
         state = .joining
         setStatus("Switching to fast link…")
+        NSLog("[FastLink] joining ssid=%@ locationAuthRaw=%@", offer.ssid,
+              "\(CLLocationManager.authorizationStatus().rawValue)")
 
         // Already associated to this hotspot (e.g. a repeated offer)? Skip
         // the join loop and go straight to the IP wait.
@@ -225,14 +248,23 @@ final class FastLinkManager: ObservableObject {
             var triedNetworkSetup = false
             while Date() < joinDeadline && !joined {
                 // Prefer cached scan results before paying for an active scan.
-                let cachedHit = iface.cachedScanResults()?.first { $0.ssid == offer.ssid }
-                let network = cachedHit ?? (try? iface.scanForNetworks(withName: offer.ssid))?.first
+                var scanResults = iface.cachedScanResults()
+                var network = scanResults?.first { $0.ssid == offer.ssid }
+                if network == nil {
+                    scanResults = try? iface.scanForNetworks(withName: offer.ssid)
+                    network = scanResults?.first
+                }
+                let scanCount = scanResults?.count ?? -1
+                let nilSSIDCount = scanResults?.filter { $0.ssid == nil }.count ?? 0
+                NSLog("[FastLink] scan count=%d nilSSIDs=%d", scanCount, nilSSIDCount)
                 if let network = network {
                     emptyScans = 0
                     do {
                         try iface.associate(to: network, password: offer.psk)
                         joined = true
                     } catch {
+                        let e = error as NSError
+                        NSLog("[FastLink] associate error code=%ld desc=%@", e.code, e.localizedDescription)
                         usleep(200_000)
                     }
                 } else {
@@ -264,6 +296,7 @@ final class FastLinkManager: ObservableObject {
             }
             usleep(50_000)
         }
+        NSLog("[FastLink] ipv4 wait result=%@", ip ?? "none")
         guard let ip = ip else {
             failJoin(deviceId: deviceId, reason: "no_ip")
             return
@@ -305,6 +338,8 @@ final class FastLinkManager: ObservableObject {
 
         state = .restoring
         setStatus("Rejoining \(previousSSID ?? "your") Wi-Fi…")
+        NSLog("[FastLink] restore prev=%@ wasOnWifi=%d plan=%@ hotspot=%@",
+              effectivePrevSSID ?? "nil", wasOnWifi, plan.name, hotspotSSID ?? "nil")
 
         iface?.disassociate()
 
@@ -321,22 +356,28 @@ final class FastLinkManager: ObservableObject {
                         rejoined = true
                         break
                     } catch {
+                        let e = error as NSError
+                        NSLog("[FastLink] restore rejoin error code=%ld desc=%@", e.code, e.localizedDescription)
                         usleep(500_000)
                     }
                 } else {
                     usleep(500_000)
                 }
             }
+            NSLog("[FastLink] restore rejoin %@ -> %@", ssid, rejoined ? "ok" : "powerCycle fallback")
             if !rejoined {
                 powerCycle(iface)
             }
         case .powerCycle:
+            NSLog("[FastLink] restore powerCycle")
             powerCycle(iface)
         case .disassociateOnly:
+            NSLog("[FastLink] restore disassociateOnly")
             break
         }
 
         if let interfaceName = interfaceName, let hotspotSSID = hotspotSSID {
+            NSLog("[FastLink] restore removePreferred ssid=%@", hotspotSSID)
             Self.removePreferredNetwork(interfaceName: interfaceName, ssid: hotspotSSID)
         }
         tearDownSession()
@@ -405,6 +446,7 @@ final class FastLinkManager: ObservableObject {
     private func replyFailed(deviceId: UUID, session: String, reason: String) {
         // reason is an internal short code; sanitize anyway.
         let safeReason = reason.filter { $0.isLetter || $0.isNumber || $0 == "_" }
+        NSLog("[FastLink] replyFailed reason=%@", safeReason)
         sendFastLinkReply(deviceId: deviceId, fields: [
             "type": "fastlink_failed",
             "session": session,
@@ -507,19 +549,25 @@ final class FastLinkManager: ObservableObject {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/sbin/networksetup")
         proc.arguments = ["-setairportnetwork", interfaceName, ssid, psk]
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = pipe
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
         do {
             try proc.run()
             proc.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
+            let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: outData, encoding: .utf8) ?? ""
+            let stderr = String(data: errData, encoding: .utf8) ?? ""
+            NSLog("[FastLink] networksetup exit=%d stderr=%@", proc.terminationStatus,
+                  stderr.trimmingCharacters(in: .whitespacesAndNewlines))
             let failed = proc.terminationStatus != 0
                 || output.contains("Error")
                 || output.contains("Could not")
             return !failed
         } catch {
+            NSLog("[FastLink] networksetup launch error=%@", "\(error)")
             return false
         }
     }

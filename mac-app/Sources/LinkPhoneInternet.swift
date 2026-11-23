@@ -9,13 +9,24 @@ import CoreWLAN
 final class LinkPhoneInternet: ObservableObject {
     static let shared = LinkPhoneInternet()
 
-    enum State: Equatable {
+    enum State: Equatable, CustomStringConvertible {
         case idle
         case waitingForPhone            // sent hotspot_request; cancellable
         case needsSetup                 // phone has no hotspot name/password saved
         case joining
         case connected(ssid: String)
         case failed(String)
+
+        var description: String {
+            switch self {
+            case .idle: return "idle"
+            case .waitingForPhone: return "waitingForPhone"
+            case .needsSetup: return "needsSetup"
+            case .joining: return "joining"
+            case .connected(let ssid): return "connected(\(ssid))"
+            case .failed(let msg): return "failed(\(msg))"
+            }
+        }
     }
 
     /// Thread-safe mirror of `isConnected` for readers off the main actor
@@ -23,7 +34,10 @@ final class LinkPhoneInternet: ObservableObject {
     nonisolated(unsafe) static var isConnectedFlag = false
 
     @Published var state: State = .idle {
-        didSet { Self.isConnectedFlag = isConnected }
+        didSet {
+            Self.isConnectedFlag = isConnected
+            NSLog("[PhoneInternet] state %@ -> %@", oldValue.description, state.description)
+        }
     }
     /// True while joined to the phone hotspot (used to suppress fast link).
     var isConnected: Bool {
@@ -52,6 +66,7 @@ final class LinkPhoneInternet: ObservableObject {
         }
         state = .waitingForPhone
         send(["type": "hotspot_request"])
+        NSLog("[PhoneInternet] hotspot_request sent")
         armWaitTimeout()
     }
 
@@ -64,6 +79,7 @@ final class LinkPhoneInternet: ObservableObject {
     func cancel() {
         guard state == .waitingForPhone else { return }
         send(["type": "hotspot_cancel"])
+        NSLog("[PhoneInternet] hotspot_cancel sent")
         clearWait()
         state = .idle
     }
@@ -98,6 +114,7 @@ final class LinkPhoneInternet: ObservableObject {
     /// Handle {"type":"hotspot_status", ...} routed from LinkServer.
     func handleStatus(_ json: [String: Any]) {
         guard let stateName = json["state"] as? String else { return }
+        NSLog("[PhoneInternet] hotspot_status received state=%@", stateName)
         switch stateName {
         case "needs_setup":
             clearWait()
@@ -133,14 +150,17 @@ final class LinkPhoneInternet: ObservableObject {
         }
         state = .joining
         joinedSSID = ssid
+        NSLog("[PhoneInternet] join start ssid=%@", ssid)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
                 try LinkWifiJoiner.join(ssid: ssid, psk: password)
+                NSLog("[PhoneInternet] join result ok ssid=%@", ssid)
                 DispatchQueue.main.async {
                     guard let self = self else { return }
                     self.state = .connected(ssid: ssid)
                 }
             } catch {
+                NSLog("[PhoneInternet] join result fail ssid=%@ err=%@", ssid, "\(error)")
                 DispatchQueue.main.async {
                     guard let self = self else { return }
                     // Restore the previous network but KEEP the failure visible;
@@ -159,6 +179,7 @@ final class LinkPhoneInternet: ObservableObject {
     private func restoreNetwork() {
         let prev = previousSSID
         let wasOn = wasOnWifi
+        NSLog("[PhoneInternet] restore prev=%@ wasOnWifi=%d", prev ?? "nil", wasOn)
         DispatchQueue.global(qos: .userInitiated).async {
             LinkWifiJoiner.restore(previousSSID: prev, wasOnWifi: wasOn)
         }

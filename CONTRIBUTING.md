@@ -4,7 +4,7 @@ Thank you for your interest in contributing to **Link**! Our mission is to build
 
 ---
 
-## 🛠️ Local Development Setup
+## Local Development Setup
 
 Link is structured as a native multi-platform repository:
 
@@ -32,7 +32,7 @@ Link is structured as a native multi-platform repository:
 
 ---
 
-## 📡 Wire Protocol Specification (`TCP :8765`)
+## Wire Protocol Specification (`TCP :8765`)
 
 Link uses newline-delimited JSON (`\n`) for metadata control framing over a persistent TCP socket on port `8765`, discovered automatically on the local network via Bonjour (`_clipboardsync._tcp`). High-speed binary file streams utilize framed AES-GCM data chunks.
 
@@ -60,7 +60,7 @@ Link uses newline-delimited JSON (`\n`) for metadata control framing over a pers
 
 ---
 
-## 📋 Pull Request & Contribution Guidelines
+## Pull Request & Contribution Guidelines
 
 1. **Native & Lightweight Above All:**
    - Prefer native platform APIs (`Network.framework`, `CryptoKit`, `android.net.nsd`, `java.security`) over bloated external dependencies.
