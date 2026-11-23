@@ -1616,9 +1616,7 @@ class MainActivity : AppCompatActivity(), NetworkSyncClient.SyncListener, Clipbo
     }
 
     private fun isNotificationServiceEnabled(): Boolean {
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: return false
-        val expected = "${packageName}/${LinkNotificationListenerService::class.java.canonicalName}"
-        return flat.split(':').any { it.equals(expected, ignoreCase = true) || it.contains(packageName) }
+        return androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
